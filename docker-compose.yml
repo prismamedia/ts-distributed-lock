@@ -1,0 +1,28 @@
+version: '3.7'
+
+services:
+  mongo:
+    image: mongo:3.2
+    ports:
+      - 27017:27017
+    logging:
+      options:
+        max-size: 50k
+        max-file: '1'
+    restart: on-failure
+
+  project:
+    image: node:10
+    depends_on:
+      - mongo
+    environment:
+      # cf: https://docs.mongodb.com/manual/reference/connection-string/
+      MONGODB_URL: mongodb://mongo:27017/ts-distributed-lock-tests
+    working_dir: /usr/src/app
+    volumes:
+      - .:/usr/src/app:cached
+      - ~/.bash_history:/root/.bash_history
+    logging:
+      options:
+        max-size: 50k
+        max-file: '1'

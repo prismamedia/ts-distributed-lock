@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./ts-distributed-lock/tsconfig.esm.json"
+    },
+    {
+      "path": "./ts-distributed-lock-mongodb-adapter/tsconfig.esm.json"
+    }
+  ]
+}

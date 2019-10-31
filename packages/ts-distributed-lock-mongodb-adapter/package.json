@@ -1,0 +1,34 @@
+{
+  "name": "@prismamedia/ts-distributed-lock-mongodb-adapter",
+  "version": "1.0.0-rc.1",
+  "license": "MIT",
+  "contributors": [
+    "Yvann Boucher <yvann.boucher@gmail.com>"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prismamedia/ts-distributed-lock"
+  },
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "typings": "dist/types/index.d.ts",
+  "scripts": {
+    "build": "tsc --build tsconfig.json tsconfig.esm.json",
+    "build:watch": "yarn run build --watch",
+    "test": "NODE_ENV=test jest --detectOpenHandles --forceExit --verbose --passWithNoTests",
+    "test:watch": "yarn run test --watchAll"
+  },
+  "devDependencies": {
+    "@types/jest": "^24.0.22",
+    "@types/node": "^12.12.6",
+    "jest": "^24.9.0",
+    "ts-jest": "^24.1.0",
+    "typescript": "^3.7.2"
+  },
+  "dependencies": {
+    "@prismamedia/ts-distributed-lock": "^1.0.0-rc.1",
+    "@types/mongodb": "^3.3.8",
+    "mongodb": "^3.3.3",
+    "typescript-memoize": "^1.0.0-alpha.3"
+  }
+}

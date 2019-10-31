@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./ts-distributed-lock"
+    },
+    {
+      "path": "./ts-distributed-lock-mongodb-adapter"
+    }
+  ]
+}

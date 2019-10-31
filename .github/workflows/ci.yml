@@ -1,0 +1,138 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - name: Setup node v10
+        uses: actions/setup-node@v1
+        with:
+          node-version: 10
+
+      - name: Cache yarn
+        uses: actions/cache@v1
+        with:
+          path: ~/.cache/yarn
+          key: ${{ runner.OS }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.OS }}-yarn-
+
+      - name: Install dependencies
+        run: yarn install --no-progress --non-interactive --frozen-lockfile
+
+      - name: Create workspace artifact
+        run: touch workspace.tar.gz && tar -czf workspace.tar.gz .
+
+      - name: Save workspace
+        uses: actions/upload-artifact@v1
+        with:
+          name: workspace
+          path: workspace.tar.gz
+
+  build-and-test-ts-distributed-lock:
+    needs: setup
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        package: ['ts-distributed-lock']
+        node: ['10', '12']
+
+    steps:
+      - name: Download workspace
+        uses: actions/download-artifact@v1
+        with:
+          name: workspace
+          path: .
+
+      - name: Restore workspace
+        run: tar -xzf workspace.tar.gz
+
+      - name: Setup node v${{ matrix.node }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Build
+        run: cd packages/${{ matrix.package }} && yarn run build
+
+      - name: Test
+        run: cd packages/${{ matrix.package }} && yarn run test
+
+  build-and-test-ts-distributed-lock-mongodb-adapter:
+    needs: setup
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        package: ['ts-distributed-lock-mongodb-adapter']
+        node: ['10', '12']
+        mongo: ['3.2', '3.6']
+
+    services:
+      mongo:
+        image: mongo:${{ matrix.mongo }}
+        ports:
+          - 27017/tcp
+
+    steps:
+      - name: Download workspace
+        uses: actions/download-artifact@v1
+        with:
+          name: workspace
+          path: .
+
+      - name: Restore workspace
+        run: tar -xzf workspace.tar.gz
+
+      - name: Setup node v${{ matrix.node }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Build
+        run: cd packages/${{ matrix.package }} && yarn run build
+
+      - name: Test
+        run: cd packages/${{ matrix.package }} && yarn run test
+        env:
+          MONGODB_URL: mongodb://localhost:${{ job.services.mongo.ports[27017] }}/${{ matrix.package }}
+
+  build-and-publish:
+    if: "startsWith(github.ref, 'refs/tags/')"
+    needs: ['build-and-test-ts-distributed-lock', 'build-and-test-ts-distributed-lock-mongodb-adapter']
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download workspace
+        uses: actions/download-artifact@v1
+        with:
+          name: workspace
+          path: .
+
+      - name: Restore workspace
+        run: tar -xzf workspace.tar.gz
+
+      - name: Setup node v10
+        uses: actions/setup-node@v1
+        with:
+          node-version: 10
+
+      - name: Build
+        run: yarn build
+
+      - name: Publish to npmjs
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_REGISTRY_AUTH_TOKEN}" > .npmrc
+          yarn run lerna publish from-git --yes --no-git-reset --registry https://registry.npmjs.org/
+        env:
+          CI: true
+          NPM_REGISTRY_AUTH_TOKEN: ${{ secrets.NPM_REGISTRY_AUTH_TOKEN }}
