@@ -1,6 +1,6 @@
 **Typescript distributed lock**
 
-[![npm version](https://badge.fury.io/js/%40prismamedia%2Fts-distributed-lock.svg)](https://badge.fury.io/js/%40prismamedia%2Fts-distributed-lock) ![github actions](https://github.com/prismamedia/ts-distributed-lock/workflows/CI/badge.svg) [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier)
+[![npm version](https://badge.fury.io/js/%40prismamedia%2Fts-distributed-lock.svg)](https://badge.fury.io/js/%40prismamedia%2Fts-distributed-lock) [![github actions status](https://github.com/prismamedia/ts-distributed-lock/workflows/CI/badge.svg)](https://github.com/prismamedia/ts-distributed-lock/actions) [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier)
 
 Provide an easy-to-use "Readers-writers lock" https://en.wikipedia.org/wiki/Readers–writer_lock
 
@@ -24,7 +24,7 @@ The adapter may needs some setup before use
 
 ```ts
 // ./setup.ts
-import { Locker } from './locker';
+import { locker } from './locker';
 
 await locker.setup();
 ```
@@ -33,7 +33,7 @@ await locker.setup();
 
 ```ts
 // ./usage.ts
-import { Locker } from './locker';
+import { locker } from './locker';
 
 const firstLock = await locker.lockAsReader('my-lock-name');
 try {
@@ -53,6 +53,9 @@ try {
 Or with some helpers that ensure the lock is released
 
 ```ts
+// ./usage.ts
+import { locker } from './locker';
+
 const firstTaskResult = await locker.ensureReadingTaskConcurrency('my-lock-name', async () => {
   // Everything I have to do ...
 
