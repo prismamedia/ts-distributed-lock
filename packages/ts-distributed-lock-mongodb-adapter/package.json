@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@prismamedia/ts-distributed-lock": "^1.0.0-rc.2",
-    "@types/mongodb": "^3.3.8",
+    "@types/mongodb": "^3.3.9",
     "mongodb": "^3.3.3",
     "typescript-memoize": "^1.0.0-alpha.3"
   }
