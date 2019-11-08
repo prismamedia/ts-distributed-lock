@@ -1,6 +1,6 @@
 import { Lock, LockName, LockSet, LockStatus, LockType } from '../lock';
 import { sleep } from '../utils';
-import { AdapterInterface } from './adapter-interface';
+import { AdapterGarbageCollectorParams, AdapterInterface } from './adapter-interface';
 
 /**
  * For test & debug purpose as it can't be distributed
@@ -16,7 +16,7 @@ export class InMemoryAdapter implements AdapterInterface {
     this.storage.clear();
   }
 
-  public async gc() {
+  public async gc({ lockSet, gcInterval, staleAt }: AdapterGarbageCollectorParams) {
     // Do nothing
   }
 

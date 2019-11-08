@@ -1,6 +1,6 @@
 {
   "name": "@prismamedia/ts-distributed-lock-mongodb-adapter",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "license": "MIT",
   "contributors": [
     "Yvann Boucher <yvann.boucher@gmail.com>"
@@ -26,7 +26,7 @@
     "typescript": "^3.7.2"
   },
   "dependencies": {
-    "@prismamedia/ts-distributed-lock": "^1.0.0-rc.1",
+    "@prismamedia/ts-distributed-lock": "^1.0.0-rc.2",
     "@types/mongodb": "^3.3.8",
     "mongodb": "^3.3.3",
     "typescript-memoize": "^1.0.0-alpha.3"

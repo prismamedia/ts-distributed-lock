@@ -21,6 +21,18 @@ export class Locker {
     this.gcInterval = adapter.gc && options.gc !== null ? Math.max(1, options.gc || 60000) : null;
   }
 
+  public async gc(): Promise<void> {
+    if (this.adapter.gc && this.gcInterval) {
+      const staleAt = new Date(new Date().getTime() - this.gcInterval * 2);
+
+      await this.adapter.gc({
+        lockSet: this.lockSet,
+        gcInterval: this.gcInterval,
+        staleAt,
+      });
+    }
+  }
+
   @Memoize()
   public async setup(): Promise<void> {
     if (this.adapter.setup) {
@@ -31,15 +43,6 @@ export class Locker {
   public async releaseAll(): Promise<void> {
     await this.adapter.releaseAll();
     this.lockSet.clear();
-  }
-
-  public async gc(): Promise<void> {
-    if (this.adapter.gc && this.gcInterval) {
-      await this.adapter.gc({
-        lockSet: this.lockSet,
-        gcInterval: this.gcInterval,
-      });
-    }
   }
 
   protected enableGc(): void {
@@ -86,7 +89,11 @@ export class Locker {
       const acquireTimeout = lock.options.acquireTimeout;
       const acquireTimeoutId =
         acquireTimeout != null && acquireTimeout > 0
-          ? setTimeout(() => lock.reject(new AcquireTimeoutLockError(lock, acquireTimeout)), acquireTimeout)
+          ? setTimeout(() => {
+              this.lockSet.delete(lock.reject(new AcquireTimeoutLockError(lock, acquireTimeout)));
+
+              reject(lock.reason);
+            }, acquireTimeout)
           : undefined;
 
       try {

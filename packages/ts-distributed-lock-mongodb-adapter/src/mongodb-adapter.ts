@@ -5,7 +5,6 @@ import {
   Lock,
   LockId,
   LockName,
-  LockSet,
   LockStatus,
   LockType,
   sleep,
@@ -67,9 +66,8 @@ export class MongoDBAdapter implements AdapterInterface {
     );
   }
 
-  public async gc({ lockSet, gcInterval }: AdapterGarbageCollectorParams): Promise<void> {
+  public async gc({ lockSet, staleAt }: AdapterGarbageCollectorParams): Promise<void> {
     const collection = await this.getCollection();
-    const staleAt = new Date(new Date().getTime() - gcInterval * 2);
 
     await Promise.all([
       // We delete the locks not refreshed soon enought
@@ -126,10 +124,6 @@ export class MongoDBAdapter implements AdapterInterface {
         }
       }),
     ]);
-
-    if (gcInterval) {
-      await this.gc({ lockSet: new LockSet(), gcInterval });
-    }
   }
 
   public async releaseAll() {

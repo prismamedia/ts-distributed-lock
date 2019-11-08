@@ -20,6 +20,10 @@ export type AdapterSetupParams = {
 export type AdapterGarbageCollectorParams = {
   lockSet: LockSet;
   gcInterval: number;
+  /**
+   * The locks not refreshed after "staleAt" are stale
+   */
+  staleAt: Date;
 };
 
 export interface AdapterInterface {
@@ -39,12 +43,12 @@ export interface AdapterInterface {
   releaseAll: () => Promise<void>;
 
   /**
-   * Optional, the adapter may needs to be setup before use
-   */
-  setup?: (params: AdapterSetupParams) => Promise<void>;
-
-  /**
    * Optional, the adapter may provides a garbage collector to clean the "lost" locks
    */
   gc?: (params: AdapterGarbageCollectorParams) => Promise<void>;
+
+  /**
+   * Optional, the adapter may needs to be setup before use
+   */
+  setup?: (params: AdapterSetupParams) => Promise<void>;
 }
