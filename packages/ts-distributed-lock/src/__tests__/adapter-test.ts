@@ -63,12 +63,14 @@ export function testAdapter(adapter: () => AdapterInterface): void {
 
     await expect(
       getMaxConcurrency([
-        // 3 "read" tasks that run concurrently
+        // 5 "read" tasks that run concurrently
+        locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
+        locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
         locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
         locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
         locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
       ]),
-    ).resolves.toBe(3);
+    ).resolves.toBe(5);
 
     expect(locker.lockSet.size).toBe(0);
 

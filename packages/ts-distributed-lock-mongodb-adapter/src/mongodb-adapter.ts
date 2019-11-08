@@ -96,7 +96,7 @@ export class MongoDBAdapter implements AdapterInterface {
   public async setup({ gcInterval }: AdapterSetupParams) {
     const indices: NamedIndexSpecification[] = [
       { name: 'idx_name', key: { name: 1 }, unique: true },
-      { name: 'idx_queue_id', key: { 'queue.id': 1 }, unique: true },
+      { name: 'idx_queue_id', key: { 'queue.id': 1 } },
     ];
 
     if (gcInterval) {
@@ -131,35 +131,24 @@ export class MongoDBAdapter implements AdapterInterface {
     await collection.deleteMany({});
   }
 
-  protected async doRelease(lock: Lock): Promise<void> {
-    const collection = await this.getCollection();
-
-    await collection.updateOne(
-      {
-        name: lock.name,
-      },
-      {
-        $pull: { queue: { id: lock.id } as any },
-      },
-    );
-  }
-
   public async lock(lock: Lock) {
     const collection = await this.getCollection();
 
     // Push the lock into the dedicated document
-    let value: Document | null | undefined = (await collection.findOneAndUpdate(
-      { name: lock.name },
-      {
-        $setOnInsert: { name: lock.name },
-        $set: { at: new Date() },
-        $push: { queue: { id: lock.id, type: lock.type, at: new Date() } },
-      },
-      {
-        upsert: true,
-        returnOriginal: false,
-      },
-    )).value;
+    let value: Document | null | undefined = (
+      await collection.findOneAndUpdate(
+        { name: lock.name },
+        {
+          $setOnInsert: { name: lock.name },
+          $set: { at: new Date() },
+          $push: { queue: { id: lock.id, type: lock.type, at: new Date() } },
+        },
+        {
+          upsert: true,
+          returnOriginal: false,
+        },
+      )
+    ).value;
 
     try {
       if (value != null) {
