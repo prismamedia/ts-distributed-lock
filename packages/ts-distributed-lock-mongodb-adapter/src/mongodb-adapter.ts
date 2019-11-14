@@ -11,6 +11,7 @@ import {
 } from '@prismamedia/ts-distributed-lock';
 import { Collection, Db, IndexSpecification, MongoClient } from 'mongodb';
 import { Memoize } from 'typescript-memoize';
+import { AdapterLockError } from './error';
 
 type NamedIndexSpecification = IndexSpecification & { name: NonNullable<IndexSpecification['name']> };
 
@@ -37,7 +38,7 @@ export class MongoDBAdapter implements AdapterInterface {
     this.client =
       urlOrClient instanceof MongoClient
         ? urlOrClient
-        : new MongoClient(urlOrClient, { useNewUrlParser: true, useUnifiedTopology: true });
+        : new MongoClient(urlOrClient, { useNewUrlParser: true, useUnifiedTopology: true, validateOptions: true });
 
     this.collectionName = options.collectionName || 'locks';
   }
@@ -169,6 +170,8 @@ export class MongoDBAdapter implements AdapterInterface {
           (await sleep(lock.pullInterval)) &&
           (value = await collection.findOne({ 'queue.id': lock.id }))
         );
+      } else {
+        throw new AdapterLockError(lock, `The lock "${lock}" has been deleted`);
       }
     } finally {
       if (!lock.isAcquired()) {
