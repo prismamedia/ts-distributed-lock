@@ -137,11 +137,18 @@ export class MongoDBAdapter implements AdapterInterface {
       throw new AdapterLockError(lock, `The lock "${lock}" is not in the queue anymore`);
     }
 
-    return lock.type === LockType.Writer
-      ? // A "write" lock is acquired when it's the first in the queue
-        document.queue[0]?.id === lock.id
-      : // A "read" lock is acquired when it's not preceded by a "write" lock in the queue
-        document.queue.find(({ id, type }) => id === lock.id || type === LockType.Writer)?.id === lock.id;
+    const acquired =
+      lock.type === LockType.Writer
+        ? // A "write" lock is acquired when it's the first in the queue
+          document.queue[0]?.id === lock.id
+        : // A "read" lock is acquired when it's not preceded by a "write" lock in the queue
+          document.queue.find(({ id, type }) => id === lock.id || type === LockType.Writer)?.id === lock.id;
+
+    if (acquired) {
+      lock.status = LockStatus.Acquired;
+    }
+
+    return acquired;
   }
 
   public async lock(lock: Lock) {
@@ -161,17 +168,16 @@ export class MongoDBAdapter implements AdapterInterface {
       },
     );
 
-    if (this.isLockAcquired(lock, document)) {
-      // Either we acquired the lock immediately ...
-      lock.status = LockStatus.Acquired;
-    } else {
-      // ... or we start pulling every "pullInterval"ms
+    // Either we acquired the lock immediately ...
+    if (!this.isLockAcquired(lock, document)) {
+      //... or we start pulling every "pullInterval"ms
       try {
-        while ((await sleep(lock.pullInterval)) && lock.isAcquiring()) {
-          const document = await collection.findOne({ 'queue.id': lock.id });
-          if (this.isLockAcquired(lock, document)) {
-            lock.status = LockStatus.Acquired;
-          }
+        while (
+          (await sleep(lock.pullInterval)) &&
+          lock.isAcquiring() &&
+          !this.isLockAcquired(lock, await collection.findOne({ 'queue.id': lock.id }))
+        ) {
+          // Nothing to do here
         }
       } finally {
         if (!lock.isAcquired()) {
