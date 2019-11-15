@@ -9,7 +9,7 @@ import {
   LockType,
   sleep,
 } from '@prismamedia/ts-distributed-lock';
-import { Collection, Db, IndexSpecification, MongoClient } from 'mongodb';
+import { Collection, Db, IndexSpecification, MongoClient, ReadPreference } from 'mongodb';
 import { Memoize } from 'typescript-memoize';
 import { AdapterLockError } from './error';
 
@@ -38,7 +38,11 @@ export class MongoDBAdapter implements AdapterInterface {
     this.client =
       urlOrClient instanceof MongoClient
         ? urlOrClient
-        : new MongoClient(urlOrClient, { useNewUrlParser: true, useUnifiedTopology: true, validateOptions: true });
+        : new MongoClient(urlOrClient, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            validateOptions: true,
+          });
 
     this.collectionName = options.collectionName || 'locks';
   }
@@ -175,7 +179,10 @@ export class MongoDBAdapter implements AdapterInterface {
         while (
           (await sleep(lock.pullInterval)) &&
           lock.isAcquiring() &&
-          !this.isLockAcquired(lock, await collection.findOne({ 'queue.id': lock.id }))
+          !this.isLockAcquired(
+            lock,
+            await collection.findOne({ 'queue.id': lock.id }, { readPreference: ReadPreference.PRIMARY }),
+          )
         ) {
           // Nothing to do here
         }
