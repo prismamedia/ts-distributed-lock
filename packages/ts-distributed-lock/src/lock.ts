@@ -96,8 +96,8 @@ export class Lock {
   }
 
   public reject(reason: LockError): this {
-    this.status = LockStatus.Rejected;
     this.reason = reason;
+    this.status = LockStatus.Rejected;
 
     return this;
   }

@@ -136,24 +136,30 @@ export class MongoDBAdapter implements AdapterInterface {
     const collection = await this.getCollection();
 
     // Push the lock into the dedicated document
-    let value: Document | null | undefined = (
-      await collection.findOneAndUpdate(
-        { name: lock.name },
-        {
-          $setOnInsert: { name: lock.name },
-          $set: { at: new Date() },
-          $push: { queue: { id: lock.id, type: lock.type, at: new Date() } },
-        },
-        {
-          upsert: true,
-          returnOriginal: false,
-        },
-      )
-    ).value;
+    let value: Document | null | undefined;
 
     try {
-      if (value != null) {
-        do {
+      value = (
+        await collection.findOneAndUpdate(
+          { name: lock.name },
+          {
+            $setOnInsert: { name: lock.name },
+            $set: { at: new Date() },
+            $push: { queue: { id: lock.id, type: lock.type, at: new Date() } },
+          },
+          {
+            upsert: true,
+            returnOriginal: false,
+          },
+        )
+      ).value;
+    } catch (error) {
+      throw new AdapterLockError(lock, `The lock "${lock}" has not been added to the queue: ${error.message}`);
+    }
+
+    try {
+      do {
+        if (value != null) {
           if (lock.type === LockType.Writer) {
             // A "write" lock is acquired when it's the first in the queue
             if (value.queue[0]?.id === lock.id) {
@@ -165,14 +171,15 @@ export class MongoDBAdapter implements AdapterInterface {
               lock.status = LockStatus.Acquired;
             }
           }
-        } while (
-          lock.isAcquiring() &&
-          (await sleep(lock.pullInterval)) &&
-          (value = await collection.findOne({ 'queue.id': lock.id }))
-        );
-      } else {
-        throw new AdapterLockError(lock, `The lock "${lock}" has been deleted`);
-      }
+        } else {
+          throw new AdapterLockError(lock, `The lock "${lock}" has been deleted`);
+        }
+      } while (
+        lock.isAcquiring() &&
+        (await sleep(lock.pullInterval)) &&
+        lock.isAcquiring() &&
+        (value = await collection.findOne({ 'queue.id': lock.id }))
+      );
     } finally {
       if (!lock.isAcquired()) {
         // Remove the current lock
