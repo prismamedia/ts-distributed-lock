@@ -132,58 +132,52 @@ export class MongoDBAdapter implements AdapterInterface {
     await collection.deleteMany({});
   }
 
+  protected isLockAcquired(lock: Lock, document?: Document | null): boolean {
+    if (!document) {
+      throw new AdapterLockError(lock, `The lock "${lock}" is not in the queue anymore`);
+    }
+
+    return lock.type === LockType.Writer
+      ? // A "write" lock is acquired when it's the first in the queue
+        document.queue[0]?.id === lock.id
+      : // A "read" lock is acquired when it's not preceded by a "write" lock in the queue
+        document.queue.find(({ id, type }) => id === lock.id || type === LockType.Writer)?.id === lock.id;
+  }
+
   public async lock(lock: Lock) {
     const collection = await this.getCollection();
 
     // Push the lock into the dedicated document
-    let value: Document | null | undefined;
+    const { value: document } = await collection.findOneAndUpdate(
+      { name: lock.name },
+      {
+        $setOnInsert: { name: lock.name },
+        $set: { at: new Date() },
+        $push: { queue: { id: lock.id, type: lock.type, at: new Date() } },
+      },
+      {
+        upsert: true,
+        returnOriginal: false,
+      },
+    );
 
-    try {
-      value = (
-        await collection.findOneAndUpdate(
-          { name: lock.name },
-          {
-            $setOnInsert: { name: lock.name },
-            $set: { at: new Date() },
-            $push: { queue: { id: lock.id, type: lock.type, at: new Date() } },
-          },
-          {
-            upsert: true,
-            returnOriginal: false,
-          },
-        )
-      ).value;
-    } catch (error) {
-      throw new AdapterLockError(lock, `The lock "${lock}" has not been added to the queue: ${error.message}`);
-    }
-
-    try {
-      do {
-        if (value != null) {
-          if (lock.type === LockType.Writer) {
-            // A "write" lock is acquired when it's the first in the queue
-            if (value.queue[0]?.id === lock.id) {
-              lock.status = LockStatus.Acquired;
-            }
-          } else {
-            // A "read" lock is acquired when it's not preceded by a "write" lock in the queue
-            if (value.queue.find(({ id, type }) => id === lock.id || type === LockType.Writer)?.id === lock.id) {
-              lock.status = LockStatus.Acquired;
-            }
+    if (this.isLockAcquired(lock, document)) {
+      // Either we acquired the lock immediately ...
+      lock.status = LockStatus.Acquired;
+    } else {
+      // ... or we start pulling every "pullInterval"ms
+      try {
+        while ((await sleep(lock.pullInterval)) && lock.isAcquiring()) {
+          const document = await collection.findOne({ 'queue.id': lock.id });
+          if (this.isLockAcquired(lock, document)) {
+            lock.status = LockStatus.Acquired;
           }
-        } else {
-          throw new AdapterLockError(lock, `The lock "${lock}" has been deleted`);
         }
-      } while (
-        lock.isAcquiring() &&
-        (await sleep(lock.pullInterval)) &&
-        lock.isAcquiring() &&
-        (value = await collection.findOne({ 'queue.id': lock.id }))
-      );
-    } finally {
-      if (!lock.isAcquired()) {
-        // Remove the current lock
-        await collection.updateOne({ name: lock.name }, { $pull: { queue: { id: lock.id } as any } });
+      } finally {
+        if (!lock.isAcquired()) {
+          // Remove the current lock
+          await collection.updateOne({ name: lock.name }, { $pull: { queue: { id: lock.id } as any } });
+        }
       }
     }
   }
