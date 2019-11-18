@@ -20,6 +20,71 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     }
   });
 
+  afterEach(async done => {
+    try {
+      await locker.releaseAll();
+
+      done();
+    } catch (error) {
+      done.fail(error);
+    }
+  });
+
+  it(`has a working garbage collector - nothing happens`, async done => {
+    locker = new Locker(adapter(), { gc: 500 });
+
+    const firstLockName: LockName = 'my-gc-works';
+    const secondLockName: LockName = 'my-gc-still-works';
+
+    const locks = await Promise.all([
+      locker.lockAsReader(firstLockName),
+      locker.lockAsReader(firstLockName),
+      locker.lockAsReader(secondLockName),
+      locker.lockAsReader(secondLockName),
+    ]);
+
+    // Wait more than 2 * "gc" interval
+    await sleep(1500);
+
+    // Did not "collect" any locks as they were still used
+    await expect(locker.release(locks)).resolves.toBeUndefined();
+
+    done();
+  });
+
+  it(`has a working garbage collector - some locks have actually been collected`, async done => {
+    locker = new Locker(adapter(), { gc: 500 });
+
+    const firstLockName: LockName = 'my-gc-has-collected-locks';
+    const secondLockName: LockName = 'my-gc-has-collected-other-locks';
+
+    const locks = await Promise.all([
+      locker.lockAsReader(firstLockName),
+      locker.lockAsReader(firstLockName),
+      locker.lockAsReader(firstLockName),
+      locker.lockAsReader(secondLockName),
+      locker.lockAsReader(secondLockName),
+    ]);
+
+    // Let those 2 locks be "unmanaged", they won't be keep by the GC
+    locker.lockSet.delete(locks[1]);
+    locker.lockSet.delete(locks[3]);
+
+    // Wait more than 2 * "gc" interval
+    await sleep(1500);
+
+    await Promise.all([
+      expect(locker.adapter.release(locks[1])).rejects.toThrowError(
+        `The lock "${locks[1]}" was not in the queue anymore`,
+      ),
+      expect(locker.adapter.release(locks[3])).rejects.toThrowError(
+        `The lock "${locks[3]}" was not in the queue anymore`,
+      ),
+    ]);
+
+    done();
+  });
+
   it('works as expected', async done => {
     const lockName: LockName = 'my-lock';
 

@@ -1,6 +1,8 @@
 import {
+  AdapterError,
   AdapterGarbageCollectorParams,
   AdapterInterface,
+  AdapterLockError,
   AdapterSetupParams,
   Lock,
   LockId,
@@ -9,9 +11,9 @@ import {
   LockType,
   sleep,
 } from '@prismamedia/ts-distributed-lock';
-import { Collection, Db, IndexSpecification, MongoClient, ReadPreference } from 'mongodb';
+import { Admin, Collection, Db, IndexSpecification, MongoClient, MongoError, ReadPreference } from 'mongodb';
+import semver, { SemVer } from 'semver';
 import { Memoize } from 'typescript-memoize';
-import { AdapterLockError } from './error';
 
 type NamedIndexSpecification = IndexSpecification & { name: NonNullable<IndexSpecification['name']> };
 
@@ -28,11 +30,15 @@ type Document = {
 export type MongoDBAdapterOptions = {
   // Name of the collection where the locks are stored
   collectionName?: string;
+
+  // MongoDB's semantic version, saves a query if known (supports incomplete version like "3" or "3.2")
+  serverVersion?: string;
 };
 
 export class MongoDBAdapter implements AdapterInterface {
   protected client: MongoClient;
   protected collectionName: string;
+  protected serverVersion?: SemVer;
 
   public constructor(urlOrClient: string | MongoClient, protected options: Partial<MongoDBAdapterOptions> = {}) {
     this.client =
@@ -45,6 +51,18 @@ export class MongoDBAdapter implements AdapterInterface {
           });
 
     this.collectionName = options.collectionName || 'locks';
+
+    if (typeof options.serverVersion !== 'undefined') {
+      const coercedServerVersion = semver.coerce(options.serverVersion);
+      if (!(semver.valid(coercedServerVersion) && coercedServerVersion)) {
+        throw new AdapterError(
+          this,
+          `The provided "serverVersion" is not a valid semantic version: ${options.serverVersion}`,
+        );
+      }
+
+      this.serverVersion = coercedServerVersion;
+    }
   }
 
   protected async connect(): Promise<void> {
@@ -61,6 +79,30 @@ export class MongoDBAdapter implements AdapterInterface {
   }
 
   @Memoize()
+  protected async getAdmin(): Promise<Admin> {
+    const db = await this.getDb();
+
+    return db.admin();
+  }
+
+  @Memoize()
+  protected async getServerVersion(): Promise<SemVer> {
+    if (this.serverVersion) {
+      return this.serverVersion;
+    }
+
+    const admin = await this.getAdmin();
+    const { version: serverVersion } = await admin.serverStatus();
+
+    const coercedServerVersion = semver.coerce(serverVersion);
+    if (!(semver.valid(coercedServerVersion) && coercedServerVersion)) {
+      throw new AdapterError(this, `The returned "serverVersion" is not a valid semantic version: ${serverVersion}`);
+    }
+
+    return coercedServerVersion;
+  }
+
+  @Memoize()
   protected async getCollection(): Promise<Collection<Document>> {
     const db = await this.getDb();
 
@@ -72,7 +114,7 @@ export class MongoDBAdapter implements AdapterInterface {
   }
 
   public async gc({ lockSet, staleAt }: AdapterGarbageCollectorParams): Promise<void> {
-    const collection = await this.getCollection();
+    const [collection, serverVersion] = await Promise.all([this.getCollection(), this.getServerVersion()]);
 
     await Promise.all([
       // We delete the locks not refreshed soon enought
@@ -81,18 +123,41 @@ export class MongoDBAdapter implements AdapterInterface {
       // We refresh the registered locks
       ...(lockSet.size > 0
         ? [
-            collection.updateMany(
-              { 'queue.id': { $in: lockSet.getIds() } },
-              {
-                // By updating some dates, we keep them fresh and out of the next garbage collector's collecting cycle
-                $currentDate: {
-                  // Keep this very lock
-                  'queue.$.at': true,
-                  // Keep all locks of the same name, because of the TTL index
-                  at: true,
-                },
-              },
-            ),
+            semver.gte(serverVersion, '3.6.0')
+              ? // https://docs.mongodb.com/manual/reference/operator/update/positional-all/
+                collection.updateMany(
+                  { 'queue.id': { $in: lockSet.getIds() } },
+                  {
+                    // By updating some dates, we keep them fresh and out of the next garbage collector's collecting cycle
+                    $currentDate: {
+                      // Keep those very locks
+                      'queue.$[lock].at': true,
+                      // Keep all locks of the same name, because of the TTL index
+                      at: true,
+                    },
+                  },
+                  {
+                    arrayFilters: [{ 'lock.id': { $in: lockSet.getIds() } }],
+                  },
+                )
+              : // Do not support the "$[]" operator, so we have to iterate over all the locks
+                collection.bulkWrite(
+                  [...lockSet].map(lock => ({
+                    updateOne: {
+                      filter: { 'queue.id': lock.id },
+                      update: {
+                        // By updating some dates, we keep them fresh and out of the next garbage collector's collecting cycle
+                        $currentDate: {
+                          // Keep this very lock
+                          'queue.$.at': true,
+                          // Keep all locks of the same name, because of the TTL index
+                          at: true,
+                        },
+                      },
+                    },
+                  })),
+                  { ordered: false },
+                ),
           ]
         : []),
     ]);
@@ -136,9 +201,37 @@ export class MongoDBAdapter implements AdapterInterface {
     await collection.deleteMany({});
   }
 
+  protected async enqueueLock(lock: Lock, tries: number = 3): Promise<Document> {
+    const collection = await this.getCollection();
+
+    try {
+      const { value } = await collection.findOneAndUpdate(
+        { name: lock.name },
+        {
+          $setOnInsert: { name: lock.name },
+          $set: { at: new Date() },
+          $push: { queue: { id: lock.id, type: lock.type, at: new Date() } },
+        },
+        {
+          upsert: true,
+          returnOriginal: false,
+        },
+      );
+
+      return value as Document;
+    } catch (error) {
+      // We try again in case of "duplicate key" error because of the unique index on "name"
+      if (error instanceof MongoError && error.code === 11000 && tries > 1) {
+        return this.enqueueLock(lock, tries - 1);
+      } else {
+        throw error;
+      }
+    }
+  }
+
   protected isLockAcquired(lock: Lock, document?: Document | null): boolean {
     if (!document) {
-      throw new AdapterLockError(lock, `The lock "${lock}" is not in the queue anymore`);
+      throw new AdapterLockError(this, lock, `The lock "${lock}" is not in the queue anymore`);
     }
 
     const acquired =
@@ -159,18 +252,7 @@ export class MongoDBAdapter implements AdapterInterface {
     const collection = await this.getCollection();
 
     // Push the lock into the dedicated document
-    const { value: document } = await collection.findOneAndUpdate(
-      { name: lock.name },
-      {
-        $setOnInsert: { name: lock.name },
-        $set: { at: new Date() },
-        $push: { queue: { id: lock.id, type: lock.type, at: new Date() } },
-      },
-      {
-        upsert: true,
-        returnOriginal: false,
-      },
-    );
+    const document = await this.enqueueLock(lock);
 
     // Either we acquired the lock immediately ...
     if (!this.isLockAcquired(lock, document)) {
@@ -197,7 +279,15 @@ export class MongoDBAdapter implements AdapterInterface {
 
   public async release(lock: Lock) {
     const collection = await this.getCollection();
-    await collection.updateOne({ name: lock.name }, { $pull: { queue: { id: lock.id } as any } });
+
+    const { modifiedCount } = await collection.updateOne(
+      { name: lock.name },
+      { $pull: { queue: { id: lock.id } as any } },
+    );
+
+    if (modifiedCount === 0) {
+      throw new AdapterLockError(this, lock, `The lock "${lock}" was not in the queue anymore`);
+    }
 
     lock.status = LockStatus.Released;
   }
