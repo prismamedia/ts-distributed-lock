@@ -1,7 +1,7 @@
 import { AdapterInterface } from '../adapter';
 
 export class AdapterError extends Error {
-  public constructor(readonly adapter: AdapterInterface, reason?: string) {
+  public constructor(protected adapter: AdapterInterface, reason?: string) {
     super(reason);
 
     Object.defineProperty(this, 'name', {

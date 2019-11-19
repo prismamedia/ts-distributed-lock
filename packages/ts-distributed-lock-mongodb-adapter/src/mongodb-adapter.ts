@@ -218,13 +218,17 @@ export class MongoDBAdapter implements AdapterInterface {
         },
       );
 
-      return value as Document;
+      if (!value) {
+        throw new AdapterLockError(this, lock, `The lock "${lock}" has not been enqueued`);
+      }
+
+      return value;
     } catch (error) {
       // We try again in case of "duplicate key" error because of the unique index on "name"
       if (error instanceof MongoError && error.code === 11000 && tries > 1) {
         return this.enqueueLock(lock, tries - 1);
       } else {
-        throw error;
+        throw new AdapterLockError(this, lock, `The lock "${lock}" has not been enqueued: ${error.message}`);
       }
     }
   }
