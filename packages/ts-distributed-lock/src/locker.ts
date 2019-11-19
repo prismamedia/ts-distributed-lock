@@ -2,7 +2,7 @@ import { setInterval } from 'timers';
 import { Memoize } from 'typescript-memoize';
 import { AdapterInterface } from './adapter';
 import { AcquireTimeoutLockError, LockError } from './error';
-import { Lock, LockName, LockOptions, LockSet, LockStatus, LockType } from './lock';
+import { AcquiredLock, Lock, LockName, LockOptions, LockSet, LockStatus, LockType } from './lock';
 
 export type LockerOptions = {
   /**
@@ -83,12 +83,12 @@ export class Locker {
     );
   }
 
-  protected async lock(name: LockName, as: LockType, options: Partial<LockOptions> = {}): Promise<Lock> {
+  protected async lock(name: LockName, as: LockType, options: Partial<LockOptions> = {}): Promise<AcquiredLock> {
     const lock = new Lock(name, as, options);
     this.lockSet.add(lock);
     this.enableGc();
 
-    return new Promise<Lock>(async (resolve, reject) => {
+    return new Promise<AcquiredLock>(async (resolve, reject) => {
       const acquireTimeout = lock.options.acquireTimeout;
       const acquireTimeoutId =
         acquireTimeout != null && acquireTimeout > 0
@@ -121,7 +121,7 @@ export class Locker {
 
   protected async ensureTaskConcurrency<TResult>(
     name: LockName,
-    task: (lock: Lock) => TResult | Promise<TResult>,
+    task: (lock: AcquiredLock) => TResult | Promise<TResult>,
     as: LockType,
     options?: Partial<LockOptions>,
   ): Promise<TResult> {
@@ -142,7 +142,7 @@ export class Locker {
 
   public async ensureWritingTaskConcurrency<TResult>(
     name: LockName,
-    task: (lock: Lock) => TResult | Promise<TResult>,
+    task: (lock: AcquiredLock) => TResult | Promise<TResult>,
     options?: Partial<LockOptions>,
   ): Promise<TResult> {
     return this.ensureTaskConcurrency(name, task, LockType.Writer, options);
@@ -154,7 +154,7 @@ export class Locker {
 
   public async ensureReadingTaskConcurrency<TResult>(
     name: LockName,
-    task: (lock: Lock) => TResult | Promise<TResult>,
+    task: (lock: AcquiredLock) => TResult | Promise<TResult>,
     options?: Partial<LockOptions>,
   ): Promise<TResult> {
     return this.ensureTaskConcurrency(name, task, LockType.Reader, options);

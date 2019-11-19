@@ -33,6 +33,21 @@ export type LockOptions = {
   pullInterval: number | null;
 };
 
+export interface SettledLock<TStatus extends LockStatus.Acquired | LockStatus.Rejected> extends Lock {
+  settledAt: Date;
+  status: TStatus;
+}
+
+export interface AcquiredLock extends SettledLock<LockStatus.Acquired> {}
+
+export interface RejectedLock extends SettledLock<LockStatus.Rejected> {}
+
+export interface ReleasedLock extends Lock {
+  settledAt: Date;
+  releasedAt: Date;
+  status: LockStatus.Released;
+}
+
 export class Lock {
   private _id: LockId;
   private _type: LockType;
@@ -106,7 +121,7 @@ export class Lock {
     return this._status === LockStatus.Acquiring;
   }
 
-  public isAcquired(): boolean {
+  public isAcquired(): this is AcquiredLock {
     return this._status === LockStatus.Acquired;
   }
 
@@ -114,11 +129,11 @@ export class Lock {
     return this._status === LockStatus.Releasing;
   }
 
-  public isReleased(): boolean {
+  public isReleased(): this is ReleasedLock {
     return this._status === LockStatus.Released;
   }
 
-  public isRejected(): boolean {
+  public isRejected(): this is RejectedLock {
     return this._status === LockStatus.Rejected;
   }
 
