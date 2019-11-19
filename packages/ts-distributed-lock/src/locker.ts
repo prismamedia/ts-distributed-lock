@@ -1,35 +1,92 @@
+import { EventConfigMap, EventEmitter } from '@prismamedia/ts-async-event-emitter';
 import { setInterval } from 'timers';
 import { Memoize } from 'typescript-memoize';
-import { AdapterInterface } from './adapter';
+import { AdapterInterface, GarbageCycle } from './adapter';
 import { AcquireTimeoutLockError, LockError } from './error';
-import { AcquiredLock, Lock, LockName, LockOptions, LockSet, LockStatus, LockType } from './lock';
+import {
+  AcquiredLock,
+  Lock,
+  LockName,
+  LockOptions,
+  LockSet,
+  LockStatus,
+  LockType,
+  RejectedLock,
+  ReleasedLock,
+} from './lock';
 
-export type LockerOptions = {
+export enum LockerEventKind {
+  RejectedLock = 'rejected_lock',
+  AcquiredLock = 'acquired_lock',
+  ReleasedLock = 'released_lock',
+  GarbageCycle = 'garbage_cycle',
+}
+
+export type LockerEventMap = {
+  [LockerEventKind.RejectedLock]: RejectedLock;
+  [LockerEventKind.AcquiredLock]: AcquiredLock;
+  [LockerEventKind.ReleasedLock]: ReleasedLock;
+  [LockerEventKind.GarbageCycle]: GarbageCycle;
+};
+
+export type LockerOptions<TLockerEventMap extends LockerEventMap = LockerEventMap> = {
   /**
    * Optional, every "gc"ms, a garbage collector cleans the "lost" locks, default: 60000
    */
   gc?: number | null;
+
+  /**
+   * Optional, act on some events
+   */
+  on?: EventConfigMap<TLockerEventMap>;
 };
 
-export class Locker {
+export class Locker<TLockerEventMap extends LockerEventMap = LockerEventMap> extends EventEmitter<TLockerEventMap> {
   readonly lockSet = new LockSet();
 
   protected gcInterval: number | null;
   protected gcIntervalId?: ReturnType<typeof setInterval>;
 
-  public constructor(readonly adapter: AdapterInterface, readonly options: Partial<LockerOptions> = {}) {
+  public constructor(
+    readonly adapter: AdapterInterface,
+    readonly options: Partial<LockerOptions<TLockerEventMap>> = {},
+  ) {
+    super(options.on);
+
     this.gcInterval = adapter.gc && options.gc !== null ? Math.max(1, options.gc || 60000) : null;
   }
 
-  public async gc(): Promise<void> {
+  public async gc(): Promise<GarbageCycle | undefined> {
     if (this.adapter.gc && this.gcInterval) {
-      const staleAt = new Date(new Date().getTime() - this.gcInterval * 2);
+      const at = new Date();
+      const staleAt = new Date(at.getTime() - this.gcInterval * 2);
 
-      await this.adapter.gc({
+      const garbageCycle = await this.adapter.gc({
         lockSet: this.lockSet,
         gcInterval: this.gcInterval,
+        at,
         staleAt,
       });
+
+      if (garbageCycle > 0) {
+        this.emit(LockerEventKind.GarbageCycle, garbageCycle).catch(error => {
+          // Do nothing on error
+        });
+      }
+
+      return garbageCycle;
+    }
+  }
+
+  protected enableGc(): void {
+    if (!this.gcIntervalId && this.gcInterval) {
+      this.gcIntervalId = setInterval(async () => {
+        if (this.lockSet.size === 0) {
+          this.gcIntervalId && clearInterval(this.gcIntervalId);
+        } else {
+          await this.gc().catch(console.error);
+        }
+      }, this.gcInterval);
     }
   }
 
@@ -45,42 +102,34 @@ export class Locker {
     this.lockSet.clear();
   }
 
-  protected enableGc(): void {
-    if (!this.gcIntervalId && this.gcInterval) {
-      this.gcIntervalId = setInterval(async () => {
-        if (this.lockSet.size === 0) {
-          this.gcIntervalId && clearInterval(this.gcIntervalId);
-        } else {
-          await this.gc().catch(console.error);
-        }
-      }, this.gcInterval);
+  public async release(lock: Lock): Promise<void> {
+    if (lock.status === LockStatus.Releasing || !this.lockSet.has(lock)) {
+      // Do nothing, it's already releasing or released
+
+      return;
+    } else if (lock.status === LockStatus.Released) {
+      this.lockSet.delete(lock);
+
+      return;
+    }
+
+    lock.status = LockStatus.Releasing;
+
+    try {
+      await this.adapter.release(lock);
+
+      if (lock.isReleased()) {
+        this.emit(LockerEventKind.ReleasedLock, lock).catch(error => {
+          // Do nothing on error
+        });
+      }
+    } finally {
+      this.lockSet.delete(lock);
     }
   }
 
-  public async release(lockOrIterableOfLocks: Lock | Iterable<Lock> = this.lockSet): Promise<void> {
-    const locks: Lock[] = lockOrIterableOfLocks instanceof Lock ? [lockOrIterableOfLocks] : [...lockOrIterableOfLocks];
-
-    await Promise.all(
-      locks.map(async lock => {
-        if (lock.status === LockStatus.Releasing || !this.lockSet.has(lock)) {
-          // Do nothing, it's already releasing or released
-
-          return;
-        } else if (lock.status === LockStatus.Released) {
-          this.lockSet.delete(lock);
-
-          return;
-        }
-
-        lock.status = LockStatus.Releasing;
-
-        try {
-          await this.adapter.release(lock);
-        } finally {
-          this.lockSet.delete(lock);
-        }
-      }),
-    );
+  public async releaseMany(locks: Iterable<Lock>): Promise<void> {
+    await Promise.all([...locks].map(lock => this.release(lock)));
   }
 
   protected async lock(name: LockName, as: LockType, options: Partial<LockOptions> = {}): Promise<AcquiredLock> {
@@ -88,35 +137,45 @@ export class Locker {
     this.lockSet.add(lock);
     this.enableGc();
 
-    return new Promise<AcquiredLock>(async (resolve, reject) => {
-      const acquireTimeout = lock.options.acquireTimeout;
-      const acquireTimeoutId =
-        acquireTimeout != null && acquireTimeout > 0
-          ? setTimeout(() => {
-              this.lockSet.delete(lock.reject(new AcquireTimeoutLockError(lock, acquireTimeout)));
+    try {
+      return await new Promise<AcquiredLock>(async (resolve, reject) => {
+        const acquireTimeout = lock.options.acquireTimeout;
+        const acquireTimeoutId =
+          acquireTimeout != null && acquireTimeout > 0
+            ? setTimeout(() => reject(new AcquireTimeoutLockError(lock, acquireTimeout)), acquireTimeout)
+            : undefined;
 
-              reject(lock.reason);
-            }, acquireTimeout)
-          : undefined;
+        try {
+          await this.adapter.lock(lock);
 
-      try {
-        await this.adapter.lock(lock);
-
-        if (lock.isAcquired()) {
-          resolve(lock);
-        } else {
-          this.lockSet.delete(lock);
-
-          reject(lock.reason || new LockError(lock, `The lock "${lock}" has not been acquired`));
+          lock.isAcquired()
+            ? resolve(lock)
+            : reject(lock.reason || new LockError(lock, `The lock "${lock}" has not been acquired`));
+        } catch (error) {
+          reject(error);
+        } finally {
+          acquireTimeoutId && clearTimeout(acquireTimeoutId);
         }
-      } catch (error) {
-        this.lockSet.delete(lock);
+      });
+    } catch (error) {
+      this.lockSet.delete(lock);
 
-        reject(error);
-      } finally {
-        acquireTimeoutId && clearTimeout(acquireTimeoutId);
+      lock.reject(
+        error instanceof LockError ? error : new LockError(lock, `The lock "${lock}" has not been acquired: ${error}`),
+      );
+
+      throw lock.reason;
+    } finally {
+      if (lock.isAcquired()) {
+        this.emit(LockerEventKind.AcquiredLock, lock).catch(error => {
+          // Do nothing on error
+        });
+      } else if (lock.isRejected()) {
+        this.emit(LockerEventKind.RejectedLock, lock).catch(error => {
+          // Do nothing on error
+        });
       }
-    });
+    }
   }
 
   protected async ensureTaskConcurrency<TResult>(
@@ -128,9 +187,7 @@ export class Locker {
     const lock = await this.lock(name, as, options);
 
     try {
-      const result = await task(lock);
-
-      return result;
+      return await task(lock);
     } finally {
       await this.release(lock);
     }

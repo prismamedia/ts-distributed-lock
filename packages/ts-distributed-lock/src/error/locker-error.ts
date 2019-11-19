@@ -1,7 +1,5 @@
-import { AdapterInterface } from '../adapter';
-
-export class AdapterError extends Error {
-  public constructor(protected adapter: AdapterInterface, reason?: string) {
+export class LockerError extends Error {
+  public constructor(reason?: string) {
     super(reason);
 
     Object.defineProperty(this, 'name', {

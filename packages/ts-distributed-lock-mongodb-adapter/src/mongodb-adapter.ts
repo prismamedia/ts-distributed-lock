@@ -1,10 +1,11 @@
 import {
-  AdapterError,
   AdapterGarbageCollectorParams,
   AdapterInterface,
-  AdapterLockError,
   AdapterSetupParams,
+  GarbageCycle,
   Lock,
+  LockerError,
+  LockError,
   LockId,
   LockName,
   LockStatus,
@@ -55,10 +56,7 @@ export class MongoDBAdapter implements AdapterInterface {
     if (typeof options.serverVersion !== 'undefined') {
       const coercedServerVersion = semver.coerce(options.serverVersion);
       if (!(semver.valid(coercedServerVersion) && coercedServerVersion)) {
-        throw new AdapterError(
-          this,
-          `The provided "serverVersion" is not a valid semantic version: ${options.serverVersion}`,
-        );
+        throw new LockerError(`The provided "serverVersion" is not a valid semantic version: ${options.serverVersion}`);
       }
 
       this.serverVersion = coercedServerVersion;
@@ -96,7 +94,7 @@ export class MongoDBAdapter implements AdapterInterface {
 
     const coercedServerVersion = semver.coerce(serverVersion);
     if (!(semver.valid(coercedServerVersion) && coercedServerVersion)) {
-      throw new AdapterError(this, `The returned "serverVersion" is not a valid semantic version: ${serverVersion}`);
+      throw new LockerError(`The returned "serverVersion" is not a valid semantic version: ${serverVersion}`);
     }
 
     return coercedServerVersion;
@@ -113,54 +111,40 @@ export class MongoDBAdapter implements AdapterInterface {
     );
   }
 
-  public async gc({ lockSet, staleAt }: AdapterGarbageCollectorParams): Promise<void> {
-    const [collection, serverVersion] = await Promise.all([this.getCollection(), this.getServerVersion()]);
+  public async gc({ lockSet, at, staleAt }: AdapterGarbageCollectorParams): Promise<GarbageCycle> {
+    const collection = await this.getCollection();
 
-    await Promise.all([
+    const [{ modifiedCount: garbageCycle }, { modifiedCount: refreshedCount = 0 }] = await Promise.all([
       // We delete the locks not refreshed soon enought
       collection.updateMany({}, { $pull: { queue: { at: { $lt: staleAt } } } }),
 
       // We refresh the registered locks
-      ...(lockSet.size > 0
-        ? [
-            semver.gte(serverVersion, '3.6.0')
-              ? // https://docs.mongodb.com/manual/reference/operator/update/positional-all/
-                collection.updateMany(
-                  { 'queue.id': { $in: lockSet.getIds() } },
-                  {
-                    // By updating some dates, we keep them fresh and out of the next garbage collector's collecting cycle
-                    $currentDate: {
-                      // Keep those very locks
-                      'queue.$[lock].at': true,
-                      // Keep all locks of the same name, because of the TTL index
-                      at: true,
-                    },
+      lockSet.size > 0
+        ? collection.bulkWrite(
+            [...lockSet].map(lock => ({
+              updateOne: {
+                filter: { 'queue.id': lock.id },
+                update: {
+                  // By updating some dates, we keep them fresh and out of the next garbage collector's collecting cycle
+                  $set: {
+                    // Keep this very lock
+                    'queue.$.at': at,
+                    // Keep all locks of the same name, because of the TTL index
+                    at,
                   },
-                  {
-                    arrayFilters: [{ 'lock.id': { $in: lockSet.getIds() } }],
-                  },
-                )
-              : // Do not support the "$[]" operator, so we have to iterate over all the locks
-                collection.bulkWrite(
-                  [...lockSet].map(lock => ({
-                    updateOne: {
-                      filter: { 'queue.id': lock.id },
-                      update: {
-                        // By updating some dates, we keep them fresh and out of the next garbage collector's collecting cycle
-                        $currentDate: {
-                          // Keep this very lock
-                          'queue.$.at': true,
-                          // Keep all locks of the same name, because of the TTL index
-                          at: true,
-                        },
-                      },
-                    },
-                  })),
-                  { ordered: false },
-                ),
-          ]
-        : []),
+                },
+              },
+            })),
+            { ordered: false },
+          )
+        : { modifiedCount: 0 },
     ]);
+
+    if (refreshedCount !== lockSet.size) {
+      throw new LockerError(`The garbage collecting cycle missed ${lockSet.size - refreshedCount} lock(s)`);
+    }
+
+    return garbageCycle;
   }
 
   public async setup({ gcInterval }: AdapterSetupParams) {
@@ -203,14 +187,14 @@ export class MongoDBAdapter implements AdapterInterface {
 
   protected async enqueueLock(lock: Lock, tries: number = 3): Promise<Document> {
     const collection = await this.getCollection();
+    const at = new Date();
 
     try {
       const { value } = await collection.findOneAndUpdate(
         { name: lock.name },
         {
-          $setOnInsert: { name: lock.name },
-          $set: { at: new Date() },
-          $push: { queue: { id: lock.id, type: lock.type, at: new Date() } },
+          $setOnInsert: { name: lock.name, at },
+          $push: { queue: { id: lock.id, type: lock.type, at } },
         },
         {
           upsert: true,
@@ -219,7 +203,7 @@ export class MongoDBAdapter implements AdapterInterface {
       );
 
       if (!value) {
-        throw new AdapterLockError(this, lock, `The lock "${lock}" has not been enqueued`);
+        throw new LockError(lock, `The lock "${lock}" has not been enqueued`);
       }
 
       return value;
@@ -228,7 +212,7 @@ export class MongoDBAdapter implements AdapterInterface {
       if (error instanceof MongoError && error.code === 11000 && tries > 1) {
         return this.enqueueLock(lock, tries - 1);
       } else {
-        throw new AdapterLockError(this, lock, `The lock "${lock}" has not been enqueued: ${error.message}`);
+        throw new LockError(lock, `The lock "${lock}" has not been enqueued: ${error.message}`);
       }
     }
   }
@@ -243,7 +227,7 @@ export class MongoDBAdapter implements AdapterInterface {
 
   protected isLockAcquired(lock: Lock, document: Document | null): boolean {
     if (!document) {
-      throw new AdapterLockError(this, lock, `The lock "${lock}" is not in the queue anymore`);
+      throw new LockError(lock, `The lock "${lock}" is not in the queue anymore`);
     }
 
     const acquired =
@@ -290,7 +274,7 @@ export class MongoDBAdapter implements AdapterInterface {
 
   public async release(lock: Lock) {
     if (!(await this.dequeueLock(lock))) {
-      throw new AdapterLockError(this, lock, `The lock "${lock}" was not in the queue anymore`);
+      throw new LockError(lock, `The lock "${lock}" was not in the queue anymore`);
     }
 
     lock.status = LockStatus.Released;

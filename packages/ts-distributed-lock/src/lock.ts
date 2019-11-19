@@ -165,11 +165,9 @@ export class Lock {
     return this._status === LockStatus.Rejected;
   }
 
-  public reject(reason: LockError): this {
+  public reject(reason: LockError): void {
     this.reason = reason;
     this.status = LockStatus.Rejected;
-
-    return this;
   }
 
   @Memoize()

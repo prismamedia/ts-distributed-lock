@@ -1,14 +1,8 @@
 import { Lock } from '../lock';
+import { LockerError } from './locker-error';
 
-export class LockError extends Error {
+export class LockError extends LockerError {
   public constructor(protected lock: Lock, reason?: string) {
     super(reason);
-
-    Object.defineProperty(this, 'name', {
-      value: new.target.name,
-      enumerable: false,
-    });
-
-    Object.setPrototypeOf(this, new.target.prototype);
   }
 }

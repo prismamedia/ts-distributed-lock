@@ -1,7 +1,8 @@
-import { AdapterError } from '../error/adapter-error';
+import { LockError } from '../error';
+import { LockerError } from '../error/locker-error';
 import { Lock, LockName, LockStatus, LockType } from '../lock';
 import { sleep } from '../utils';
-import { AdapterGarbageCollectorParams, AdapterInterface } from './adapter-interface';
+import { AdapterGarbageCollectorParams, AdapterInterface, GarbageCycle } from './adapter-interface';
 
 /**
  * For test & debug purpose as it can't be distributed
@@ -17,12 +18,15 @@ export class InMemoryAdapter implements AdapterInterface {
     this.storage.clear();
   }
 
-  public async gc({ lockSet, staleAt }: AdapterGarbageCollectorParams) {
+  public async gc({ lockSet, at, staleAt }: AdapterGarbageCollectorParams) {
+    let garbageCycle: GarbageCycle = 0;
+    let refreshedCount: number = 0;
+
     this.storage.forEach(queue =>
       queue.forEach((at, lock) => {
         // We delete the locks not refreshed soon enought
-        if (at < staleAt) {
-          queue.delete(lock);
+        if (at < staleAt && queue.delete(lock)) {
+          garbageCycle++;
         }
 
         // We refresh the registered locks
@@ -31,6 +35,21 @@ export class InMemoryAdapter implements AdapterInterface {
         }
       }),
     );
+
+    lockSet.forEach(lock => {
+      const queue = this.storage.get(lock.name);
+      if (queue && queue.has(lock)) {
+        queue.set(lock, at);
+
+        refreshedCount++;
+      }
+    });
+
+    if (refreshedCount !== lockSet.size) {
+      throw new LockerError(`The garbage collecting cycle missed ${lockSet.size - refreshedCount} lock(s)`);
+    }
+
+    return garbageCycle;
   }
 
   public async lock(lock: Lock) {
@@ -63,7 +82,7 @@ export class InMemoryAdapter implements AdapterInterface {
 
   public async release(lock: Lock) {
     if (!this.storage.get(lock.name)?.delete(lock)) {
-      throw new AdapterError(this, `The lock "${lock}" was not in the queue anymore`);
+      throw new LockError(lock, `The lock "${lock}" was not in the queue anymore`);
     }
 
     lock.status = LockStatus.Released;
