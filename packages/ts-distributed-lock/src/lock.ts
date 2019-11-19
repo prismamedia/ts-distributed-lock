@@ -35,17 +35,23 @@ export type LockOptions = {
 
 export interface SettledLock<TStatus extends LockStatus.Acquired | LockStatus.Rejected> extends Lock {
   settledAt: Date;
+  settledIn: number;
   status: TStatus;
 }
 
-export interface AcquiredLock extends SettledLock<LockStatus.Acquired> {}
+export interface AcquiredLock extends SettledLock<LockStatus.Acquired> {
+  reason: never;
+}
 
 export interface RejectedLock extends SettledLock<LockStatus.Rejected> {}
 
 export interface ReleasedLock extends Lock {
   settledAt: Date;
+  settledIn: number;
   releasedAt: Date;
+  acquiredFor: number;
   status: LockStatus.Released;
+  reason: never;
 }
 
 export class Lock {
@@ -54,7 +60,9 @@ export class Lock {
   private _status: LockStatus;
   private _createdAt: Date;
   private _settledAt?: Date;
+  private _settledIn?: number;
   private _releasedAt?: Date;
+  private _acquiredFor?: number;
   public reason?: LockError;
 
   public constructor(readonly name: LockName, type: LockType, readonly options: Partial<LockOptions> = {}) {
@@ -87,8 +95,22 @@ export class Lock {
     return this._settledAt;
   }
 
+  /**
+   * Time, in ms, took by this lock to be settled
+   */
+  public get settledIn(): number | undefined {
+    return this._settledIn;
+  }
+
   public get releasedAt(): Date | undefined {
     return this._releasedAt;
+  }
+
+  /**
+   * Time, in ms, this lock has been acquired
+   */
+  public get acquiredFor(): number | undefined {
+    return this._acquiredFor;
   }
 
   public toString(): string {
@@ -106,8 +128,14 @@ export class Lock {
       throw new WorkflowLockError(this, status);
     } else if (status === LockStatus.Acquired || status === LockStatus.Rejected) {
       this._settledAt = new Date();
+      this._settledIn = this._settledAt.getTime() - this._createdAt.getTime();
     } else if (status === LockStatus.Released) {
+      if (!this._settledAt) {
+        throw new LockError(this, `Logic error: "${this}" has to be settled for being released`);
+      }
+
       this._releasedAt = new Date();
+      this._acquiredFor = this._releasedAt.getTime() - this._settledAt.getTime();
     }
 
     this._status = status;

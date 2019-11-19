@@ -20,6 +20,8 @@ describe('Lock', () => {
 
     lock.status = LockStatus.Rejected;
     expect(lock.status).toBe(LockStatus.Rejected);
+    expect(lock.settledAt).toBeInstanceOf(Date);
+    expect(lock.settledIn).toBeGreaterThanOrEqual(0);
 
     // Cannot be changed
     expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(WorkflowLockError);
@@ -34,6 +36,8 @@ describe('Lock', () => {
 
     lock.status = LockStatus.Acquired;
     expect(lock.status).toBe(LockStatus.Acquired);
+    expect(lock.settledAt).toBeInstanceOf(Date);
+    expect(lock.settledIn).toBeGreaterThanOrEqual(0);
 
     // Can only set as "Releasing" or "Released"
     expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(WorkflowLockError);
@@ -51,6 +55,8 @@ describe('Lock', () => {
 
     lock.status = LockStatus.Released;
     expect(lock.status).toBe(LockStatus.Released);
+    expect(lock.releasedAt).toBeInstanceOf(Date);
+    expect(lock.acquiredFor).toBeGreaterThanOrEqual(0);
 
     // Cannot be changed
     expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(WorkflowLockError);
