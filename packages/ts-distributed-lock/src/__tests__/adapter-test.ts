@@ -114,7 +114,7 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     async function getConcurrency(concurrentLockSet: LockSet, lock: Lock): Promise<number> {
       concurrentLockSet.add(lock);
       const concurrency = concurrentLockSet.size;
-      await sleep(Math.floor(25 + Math.random() * 75));
+      await sleep(Math.floor(100 + Math.random() * 400));
       concurrentLockSet.delete(lock);
 
       return concurrency;

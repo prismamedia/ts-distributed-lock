@@ -73,9 +73,12 @@ export class Locker {
         }
 
         lock.status = LockStatus.Releasing;
-        this.lockSet.delete(lock);
 
-        await this.adapter.release(lock);
+        try {
+          await this.adapter.release(lock);
+        } finally {
+          this.lockSet.delete(lock);
+        }
       }),
     );
   }

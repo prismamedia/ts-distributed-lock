@@ -118,7 +118,7 @@ export class MongoDBAdapter implements AdapterInterface {
 
     await Promise.all([
       // We delete the locks not refreshed soon enought
-      collection.updateMany({}, { $pull: { queue: { at: { $lt: staleAt } } as any } }),
+      collection.updateMany({}, { $pull: { queue: { at: { $lt: staleAt } } } }),
 
       // We refresh the registered locks
       ...(lockSet.size > 0
@@ -233,7 +233,15 @@ export class MongoDBAdapter implements AdapterInterface {
     }
   }
 
-  protected isLockAcquired(lock: Lock, document?: Document | null): boolean {
+  protected async dequeueLock(lock: Lock): Promise<boolean> {
+    const collection = await this.getCollection();
+
+    const { modifiedCount } = await collection.updateOne({ name: lock.name }, { $pull: { queue: { id: lock.id } } });
+
+    return modifiedCount === 1;
+  }
+
+  protected isLockAcquired(lock: Lock, document: Document | null): boolean {
     if (!document) {
       throw new AdapterLockError(this, lock, `The lock "${lock}" is not in the queue anymore`);
     }
@@ -274,22 +282,14 @@ export class MongoDBAdapter implements AdapterInterface {
         }
       } finally {
         if (!lock.isAcquired()) {
-          // Remove the current lock
-          await collection.updateOne({ name: lock.name }, { $pull: { queue: { id: lock.id } as any } });
+          await this.dequeueLock(lock);
         }
       }
     }
   }
 
   public async release(lock: Lock) {
-    const collection = await this.getCollection();
-
-    const { modifiedCount } = await collection.updateOne(
-      { name: lock.name },
-      { $pull: { queue: { id: lock.id } as any } },
-    );
-
-    if (modifiedCount === 0) {
+    if (!(await this.dequeueLock(lock))) {
       throw new AdapterLockError(this, lock, `The lock "${lock}" was not in the queue anymore`);
     }
 

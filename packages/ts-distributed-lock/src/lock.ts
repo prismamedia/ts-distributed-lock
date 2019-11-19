@@ -37,12 +37,16 @@ export class Lock {
   private _id: LockId;
   private _type: LockType;
   private _status: LockStatus;
+  private _createdAt: Date;
+  private _settledAt?: Date;
+  private _releasedAt?: Date;
   public reason?: LockError;
 
   public constructor(readonly name: LockName, type: LockType, readonly options: Partial<LockOptions> = {}) {
     this._id = uniqid();
     this._type = type;
     this._status = LockStatus.Acquiring;
+    this._createdAt = new Date();
   }
 
   public get id(): LockId {
@@ -55,6 +59,21 @@ export class Lock {
 
   public get status(): LockStatus {
     return this._status;
+  }
+
+  public get createdAt(): Date {
+    return this._createdAt;
+  }
+
+  /**
+   * A lock is settled when it has been acquired or rejected
+   */
+  public get settledAt(): Date | undefined {
+    return this._settledAt;
+  }
+
+  public get releasedAt(): Date | undefined {
+    return this._releasedAt;
   }
 
   public toString(): string {
@@ -70,9 +89,17 @@ export class Lock {
       )
     ) {
       throw new WorkflowLockError(this, status);
+    } else if (status === LockStatus.Acquired || status === LockStatus.Rejected) {
+      this._settledAt = new Date();
+    } else if (status === LockStatus.Released) {
+      this._releasedAt = new Date();
     }
 
     this._status = status;
+  }
+
+  public isSettled(): boolean {
+    return typeof this._settledAt !== 'undefined';
   }
 
   public isAcquiring(): boolean {
