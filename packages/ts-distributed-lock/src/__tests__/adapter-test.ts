@@ -32,7 +32,8 @@ export function testAdapter(adapter: () => AdapterInterface): void {
   });
 
   it(`has a working garbage collector - nothing happens`, async done => {
-    locker = new Locker(adapter(), { gc: 500 });
+    const gc = 500;
+    locker = new Locker(adapter(), { gc });
 
     const firstLockName: LockName = 'my-gc-works';
     const secondLockName: LockName = 'my-gc-still-works';
@@ -46,6 +47,7 @@ export function testAdapter(adapter: () => AdapterInterface): void {
 
     // Wait more than 2 * "gc" interval
     await sleep(1500);
+    await locker.gc();
 
     // Did not "collect" any locks as they were still used
     await expect(locker.releaseMany(locks)).resolves.toBeUndefined();
@@ -54,8 +56,9 @@ export function testAdapter(adapter: () => AdapterInterface): void {
   });
 
   it(`has a working garbage collector - some locks have actually been collected`, async done => {
+    const gc = 500;
     locker = new Locker(adapter(), {
-      gc: 500,
+      gc,
       on: {
         // We want to be sure the 3 locks below are collected by the GC
         [LockerEventKind.GarbageCycle]: garbageCycle => expect(garbageCycle).toBe(3),
@@ -79,7 +82,7 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     locker.lockSet.delete(locks[4]);
 
     // Wait more than 2 * "gc" interval
-    await sleep(1500);
+    await sleep(4 * gc);
 
     await Promise.all([
       expect(locker.adapter.release(locks[1])).rejects.toThrowError(
