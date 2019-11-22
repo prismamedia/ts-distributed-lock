@@ -31,7 +31,10 @@ export type AdapterGarbageCollectorParams = {
 /**
  * Number of locks collected
  */
-export type GarbageCycle = number;
+export type GarbageCycle = {
+  collectedCount: number;
+  refreshedCount: number;
+};
 
 /**
  * AdapterInterface

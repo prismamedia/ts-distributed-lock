@@ -1,4 +1,4 @@
-import { EventConfigMap, EventEmitter } from '@prismamedia/ts-async-event-emitter';
+import { EventEmitter } from 'events';
 import { setInterval } from 'timers';
 import { Memoize } from 'typescript-memoize';
 import { AdapterInterface, GarbageCycle } from './adapter';
@@ -20,6 +20,7 @@ export enum LockerEventKind {
   AcquiredLock = 'acquired_lock',
   ReleasedLock = 'released_lock',
   GarbageCycle = 'garbage_cycle',
+  Error = 'error',
 }
 
 export type LockerEventMap = {
@@ -27,31 +28,24 @@ export type LockerEventMap = {
   [LockerEventKind.AcquiredLock]: AcquiredLock;
   [LockerEventKind.ReleasedLock]: ReleasedLock;
   [LockerEventKind.GarbageCycle]: GarbageCycle;
+  [LockerEventKind.Error]: Error;
 };
 
-export type LockerOptions<TLockerEventMap extends LockerEventMap = LockerEventMap> = {
+export type LockerOptions = {
   /**
    * Optional, every "gc"ms, a garbage collector cleans the "lost" locks, default: 60000
    */
   gc?: number | null;
-
-  /**
-   * Optional, act on some events
-   */
-  on?: EventConfigMap<TLockerEventMap>;
 };
 
-export class Locker<TLockerEventMap extends LockerEventMap = LockerEventMap> extends EventEmitter<TLockerEventMap> {
+export class Locker extends EventEmitter {
   readonly lockSet = new LockSet();
 
   protected gcInterval: number | null;
   protected gcIntervalId?: ReturnType<typeof setInterval>;
 
-  public constructor(
-    readonly adapter: AdapterInterface,
-    readonly options: Partial<LockerOptions<TLockerEventMap>> = {},
-  ) {
-    super(options.on);
+  public constructor(readonly adapter: AdapterInterface, readonly options: Partial<LockerOptions> = {}) {
+    super();
 
     this.gcInterval = adapter.gc && options.gc !== null ? Math.max(1, options.gc || 60000) : null;
   }
@@ -61,20 +55,12 @@ export class Locker<TLockerEventMap extends LockerEventMap = LockerEventMap> ext
       const at = new Date();
       const staleAt = new Date(at.getTime() - this.gcInterval * 2);
 
-      const garbageCycle = await this.adapter.gc({
+      return this.adapter.gc({
         lockSet: this.lockSet,
         gcInterval: this.gcInterval,
         at,
         staleAt,
       });
-
-      if (garbageCycle > 0) {
-        this.emit(LockerEventKind.GarbageCycle, garbageCycle).catch(error => {
-          // Do nothing on error
-        });
-      }
-
-      return garbageCycle;
     }
   }
 
@@ -84,7 +70,14 @@ export class Locker<TLockerEventMap extends LockerEventMap = LockerEventMap> ext
         if (this.lockSet.size === 0) {
           this.gcIntervalId && clearInterval(this.gcIntervalId);
         } else {
-          await this.gc().catch(console.error);
+          try {
+            const garbageCycle = await this.gc();
+            if (garbageCycle) {
+              this.emit(LockerEventKind.GarbageCycle, garbageCycle);
+            }
+          } catch (error) {
+            this.emit(LockerEventKind.Error, error);
+          }
         }
       }, this.gcInterval);
     }
@@ -119,9 +112,7 @@ export class Locker<TLockerEventMap extends LockerEventMap = LockerEventMap> ext
       await this.adapter.release(lock);
 
       if (lock.isReleased()) {
-        this.emit(LockerEventKind.ReleasedLock, lock).catch(error => {
-          // Do nothing on error
-        });
+        this.emit(LockerEventKind.ReleasedLock, lock);
       }
     } finally {
       this.lockSet.delete(lock);
@@ -167,13 +158,9 @@ export class Locker<TLockerEventMap extends LockerEventMap = LockerEventMap> ext
       throw lock.reason;
     } finally {
       if (lock.isAcquired()) {
-        this.emit(LockerEventKind.AcquiredLock, lock).catch(error => {
-          // Do nothing on error
-        });
+        this.emit(LockerEventKind.AcquiredLock, lock);
       } else if (lock.isRejected()) {
-        this.emit(LockerEventKind.RejectedLock, lock).catch(error => {
-          // Do nothing on error
-        });
+        this.emit(LockerEventKind.RejectedLock, lock);
       }
     }
   }

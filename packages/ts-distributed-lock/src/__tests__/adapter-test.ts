@@ -2,7 +2,7 @@ import { Locker } from '..';
 import { AdapterInterface } from '../adapter';
 import { AcquireTimeoutLockError } from '../error';
 import { Lock, LockName, LockSet, LockStatus } from '../lock';
-import { LockerEventKind } from '../locker';
+import { LockerEventKind, LockerEventMap } from '../locker';
 import { sleep } from '../utils';
 
 export function testAdapter(adapter: () => AdapterInterface): void {
@@ -35,6 +35,13 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     const gc = 500;
     locker = new Locker(adapter(), { gc });
 
+    let collectedCount = 0;
+    let refreshedCount = 0;
+    locker.on(LockerEventKind.GarbageCycle, (garbageCycle: LockerEventMap[LockerEventKind.GarbageCycle]) => {
+      collectedCount += garbageCycle.collectedCount;
+      refreshedCount += garbageCycle.refreshedCount;
+    });
+
     const firstLockName: LockName = 'my-gc-works';
     const secondLockName: LockName = 'my-gc-still-works';
 
@@ -46,8 +53,10 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     ]);
 
     // Wait more than 2 * "gc" interval
-    await sleep(1500);
-    await locker.gc();
+    await sleep(4 * gc);
+
+    expect(collectedCount).toBe(0);
+    expect(refreshedCount).toBeGreaterThanOrEqual(2);
 
     // Did not "collect" any locks as they were still used
     await expect(locker.releaseMany(locks)).resolves.toBeUndefined();
@@ -57,12 +66,13 @@ export function testAdapter(adapter: () => AdapterInterface): void {
 
   it(`has a working garbage collector - some locks have actually been collected`, async done => {
     const gc = 500;
-    locker = new Locker(adapter(), {
-      gc,
-      on: {
-        // We want to be sure the 3 locks below are collected by the GC
-        [LockerEventKind.GarbageCycle]: garbageCycle => expect(garbageCycle).toBe(3),
-      },
+    locker = new Locker(adapter(), { gc });
+
+    let collectedCount = 0;
+    let refreshedCount = 0;
+    locker.on(LockerEventKind.GarbageCycle, (garbageCycle: LockerEventMap[LockerEventKind.GarbageCycle]) => {
+      collectedCount += garbageCycle.collectedCount;
+      refreshedCount += garbageCycle.refreshedCount;
     });
 
     const firstLockName: LockName = 'my-gc-has-collected-locks';
@@ -84,6 +94,9 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     // Wait more than 2 * "gc" interval
     await sleep(4 * gc);
 
+    expect(collectedCount).toBeGreaterThanOrEqual(2);
+    expect(refreshedCount).toBeGreaterThanOrEqual(2);
+
     await Promise.all([
       expect(locker.adapter.release(locks[1])).rejects.toThrowError(
         `The lock "${locks[1]}" was not in the queue anymore`,
@@ -96,28 +109,25 @@ export function testAdapter(adapter: () => AdapterInterface): void {
       ),
     ]);
 
-    expect.assertions(4);
-
     done();
   });
 
   it('works as expected', async done => {
-    locker.onConfig({
-      [LockerEventKind.AcquiredLock]: lock => {
+    locker
+      .on(LockerEventKind.AcquiredLock, (lock: LockerEventMap[LockerEventKind.AcquiredLock]) => {
         expect(lock).toBeInstanceOf(Lock);
-        expect(lock.status).toBeInstanceOf(LockStatus.Acquired);
+        expect(lock.status).toBe(LockStatus.Acquired);
         expect(lock.settledAt).toBeInstanceOf(Date);
         expect(lock.settledIn).toEqual(expect.any(Number));
-      },
-      [LockerEventKind.ReleasedLock]: lock => {
+      })
+      .on(LockerEventKind.ReleasedLock, (lock: LockerEventMap[LockerEventKind.ReleasedLock]) => {
         expect(lock).toBeInstanceOf(Lock);
-        expect(lock.status).toBeInstanceOf(LockStatus.Released);
+        expect(lock.status).toBe(LockStatus.Released);
         expect(lock.settledAt).toBeInstanceOf(Date);
         expect(lock.settledIn).toEqual(expect.any(Number));
         expect(lock.releasedAt).toBeInstanceOf(Date);
         expect(lock.acquiredFor).toEqual(expect.any(Number));
-      },
-    });
+      });
 
     const lockName: LockName = 'my-lock';
 

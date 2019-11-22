@@ -1099,11 +1099,6 @@
   dependencies:
     "@types/node" ">= 8"
 
-"@prismamedia/ts-async-event-emitter@^2.2.0":
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/@prismamedia/ts-async-event-emitter/-/ts-async-event-emitter-2.2.0.tgz#e2ffc18e0114e9785ba2da6e5a59c10ba986cd7a"
-  integrity sha512-//cWIZgLsGfFDfnAeyD6FkyctgTCXU7KFMQ9t6Vh/peLlCWProJo1ahVpeFaUOJkEHuen7TYWiQcOFFSyGW5Yg==
-
 "@types/babel__core@^7.1.0":
   version "7.1.3"
   resolved "https://registry.yarnpkg.com/@types/babel__core/-/babel__core-7.1.3.tgz#e441ea7df63cd080dfcd02ab199e6d16a735fc30"
@@ -5370,9 +5365,9 @@ resolve@1.1.7:
   integrity sha1-IDEU2CrSxe2ejgQRs5ModeiJ6Xs=
 
 resolve@1.x, resolve@^1.10.0, resolve@^1.3.2:
-  version "1.12.0"
-  resolved "https://registry.yarnpkg.com/resolve/-/resolve-1.12.0.tgz#3fc644a35c84a48554609ff26ec52b66fa577df6"
-  integrity sha512-B/dOmuoAik5bKcD6s6nXDCjzUKnaDvdkRyAk6rsmsKLipWj4797iothd7jmmUhWTfinVMU+wc56rYKsit2Qy4w==
+  version "1.12.2"
+  resolved "https://registry.yarnpkg.com/resolve/-/resolve-1.12.2.tgz#08b12496d9aa8659c75f534a8f05f0d892fff594"
+  integrity sha512-cAVTI2VLHWYsGOirfeYVVQ7ZDejtQ9fp4YhYckWDEkFfqbVjaT11iM8k6xSAfGFMM+gDpZjMnFssPu8we+mqFw==
   dependencies:
     path-parse "^1.0.6"
 

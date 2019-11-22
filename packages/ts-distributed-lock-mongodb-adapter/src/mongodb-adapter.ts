@@ -114,7 +114,7 @@ export class MongoDBAdapter implements AdapterInterface {
   public async gc({ lockSet, at, staleAt }: AdapterGarbageCollectorParams): Promise<GarbageCycle> {
     const collection = await this.getCollection();
 
-    const [{ modifiedCount: garbageCycle }, { modifiedCount: refreshedCount = 0 }] = await Promise.all([
+    const [{ modifiedCount: collectedCount }, { modifiedCount: refreshedCount = 0 }] = await Promise.all([
       // We delete the locks not refreshed soon enought
       collection.updateMany({}, { $pull: { queue: { at: { $lt: staleAt } } } }),
 
@@ -140,11 +140,10 @@ export class MongoDBAdapter implements AdapterInterface {
         : { modifiedCount: 0 },
     ]);
 
-    if (refreshedCount !== lockSet.size) {
-      throw new LockerError(`The garbage collecting cycle missed ${lockSet.size - refreshedCount} lock(s)`);
-    }
-
-    return garbageCycle;
+    return {
+      collectedCount,
+      refreshedCount,
+    };
   }
 
   public async setup({ gcInterval }: AdapterSetupParams) {
