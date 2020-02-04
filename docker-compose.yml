@@ -20,7 +20,7 @@ services:
       MONGODB_URL: mongodb://mongo:27017/ts-distributed-lock-tests
     working_dir: /usr/src/app
     volumes:
-      - .:/usr/src/app:cached
+      - .:/usr/src/app:delegated
       - ~/.bash_history:/root/.bash_history
     logging:
       options:
