@@ -12,17 +12,23 @@ services:
     restart: on-failure
 
   project:
-    image: node:10
+    image: node:12
     depends_on:
       - mongo
     environment:
       # cf: https://docs.mongodb.com/manual/reference/connection-string/
       MONGODB_URL: mongodb://mongo:27017/ts-distributed-lock-tests
+
+      YARN_CACHE_FOLDER: /var/cache/yarn
     working_dir: /usr/src/app
     volumes:
       - .:/usr/src/app:delegated
       - ~/.bash_history:/root/.bash_history
+      - yarn_cache:/var/cache/yarn
     logging:
       options:
         max-size: 50k
         max-file: '1'
+
+volumes:
+  yarn_cache: ~

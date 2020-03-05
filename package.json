@@ -8,19 +8,19 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=10"
+    "node": ">=12"
   },
   "scripts": {
-    "build": "tsc --build packages/tsconfig.json packages/tsconfig.esm.json",
-    "build:clean": "yarn run build --clean",
-    "build:watch": "yarn run build --watch",
-    "clean": "git clean -dfqX -- .",
+    "build": "tsc --build tsconfig.json tsconfig.esm.json",
+    "build:clean": "tsc --build tsconfig.json tsconfig.esm.json --clean",
+    "build:watch": "tsc --build tsconfig.json --watch",
+    "clean": "git clean -dfqx -- .",
     "prettier": "prettier --write \"./**/src/**/*.ts\"",
     "test": "lerna run --parallel test"
   },
   "devDependencies": {
     "lerna": "^3.20.2",
     "prettier": "^1.19.1",
-    "typescript": "^3.7.5"
+    "typescript": "^3.8.3"
   }
 }

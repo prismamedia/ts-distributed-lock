@@ -29,7 +29,7 @@ type Document = {
 };
 
 export type MongoDBAdapterOptions = {
-  // Name of the collection where the locks are stored
+  // Name of the collection where the locks are stored, default: "locks"
   collectionName?: string;
 
   // MongoDB's semantic version, saves a query if known (supports incomplete version like "3" or "3.2")

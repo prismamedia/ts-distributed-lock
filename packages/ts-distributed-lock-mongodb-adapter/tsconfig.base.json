@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base",
+  "compilerOptions": {
+    "rootDir": "src"
+  },
+  "references": [
+    {
+      "path": "../ts-distributed-lock"
+    }
+  ]
+}

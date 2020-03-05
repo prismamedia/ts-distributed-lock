@@ -12,10 +12,10 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Setup node v10
+      - name: Setup node v12
         uses: actions/setup-node@v1
         with:
-          node-version: 10
+          node-version: 12
 
       - name: Cache yarn
         uses: actions/cache@v1
@@ -44,7 +44,7 @@ jobs:
     strategy:
       matrix:
         package: ['ts-distributed-lock']
-        node: ['10', '12']
+        node: ['12', '13']
 
     steps:
       - name: Download workspace
@@ -74,7 +74,7 @@ jobs:
     strategy:
       matrix:
         package: ['ts-distributed-lock-mongodb-adapter']
-        node: ['10', '12']
+        node: ['12', '13']
         mongo: ['3.2', '3.6']
 
     services:
@@ -121,10 +121,10 @@ jobs:
       - name: Restore workspace
         run: tar -xzf workspace.tar.gz
 
-      - name: Setup node v10
+      - name: Setup node v12
         uses: actions/setup-node@v1
         with:
-          node-version: 10
+          node-version: 12
 
       - name: Build
         run: yarn build

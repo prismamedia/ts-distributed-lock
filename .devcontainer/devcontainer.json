@@ -1,0 +1,9 @@
+{
+  "name": "Typescript distributed lock",
+  "dockerComposeFile": ["../docker-compose.yml", "docker-compose.yml"],
+  "service": "project",
+  "workspaceFolder": "/usr/src/app",
+  "workspaceMountConsistency": "delegated",
+  "postCreateCommand": "yarn install",
+  "extensions": ["esbenp.prettier-vscode"]
+}
