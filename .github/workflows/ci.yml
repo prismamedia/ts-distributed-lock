@@ -29,7 +29,7 @@ jobs:
         run: yarn install --no-progress --non-interactive --frozen-lockfile
 
       - name: Create workspace artifact
-        run: touch workspace.tar.gz && tar -czf workspace.tar.gz .
+        run: touch workspace.tar.gz && tar --exclude=workspace.tar.gz -czf workspace.tar.gz .
 
       - name: Save workspace
         uses: actions/upload-artifact@v1
@@ -108,7 +108,11 @@ jobs:
 
   build-and-publish:
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: ['build-and-test-ts-distributed-lock', 'build-and-test-ts-distributed-lock-mongodb-adapter']
+    needs:
+      [
+        'build-and-test-ts-distributed-lock',
+        'build-and-test-ts-distributed-lock-mongodb-adapter',
+      ]
     runs-on: ubuntu-latest
 
     steps:

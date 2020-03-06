@@ -5,5 +5,10 @@
     "declaration": false,
     "module": "ESNext",
     "outDir": "dist/esm"
-  }
+  },
+  "references": [
+    {
+      "path": "../ts-distributed-lock"
+    }
+  ]
 }
