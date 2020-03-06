@@ -1,7 +1,10 @@
 import { LockerError, LockError } from '../error';
 import { Lock, LockName, LockStatus, LockType } from '../lock';
 import { sleep } from '../utils';
-import { AdapterGarbageCollectorParams, AdapterInterface } from './adapter-interface';
+import {
+  AdapterGarbageCollectorParams,
+  AdapterInterface,
+} from './adapter-interface';
 
 /**
  * For test & debug purpose as it can't be distributed
@@ -38,7 +41,10 @@ export class InMemoryAdapter implements AdapterInterface {
     });
 
     if (refreshedCount !== lockSet.size) {
-      throw new LockerError(`The garbage collecting cycle missed ${lockSet.size - refreshedCount} lock(s)`);
+      throw new LockerError(
+        `The garbage collecting cycle missed ${lockSet.size -
+          refreshedCount} lock(s)`,
+      );
     }
 
     return {
@@ -64,7 +70,12 @@ export class InMemoryAdapter implements AdapterInterface {
         }
       } else {
         // A "read" lock is acquired when it's not preceded by a "write" lock in the queue
-        if ([...queue.keys()].find(lockInSet => lockInSet === lock || lockInSet.type === LockType.Writer) === lock) {
+        if (
+          [...queue.keys()].find(
+            lockInSet =>
+              lockInSet === lock || lockInSet.type === LockType.Writer,
+          ) === lock
+        ) {
           lock.status = LockStatus.Acquired;
         }
       }
@@ -77,7 +88,10 @@ export class InMemoryAdapter implements AdapterInterface {
 
   public async release(lock: Lock) {
     if (!this.storage.get(lock.name)?.delete(lock)) {
-      throw new LockError(lock, `The lock "${lock}" was not in the queue anymore`);
+      throw new LockError(
+        lock,
+        `The lock "${lock}" was not in the queue anymore`,
+      );
     }
 
     lock.status = LockStatus.Released;

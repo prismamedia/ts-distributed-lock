@@ -37,10 +37,13 @@ export function testAdapter(adapter: () => AdapterInterface): void {
 
     let collectedCount = 0;
     let refreshedCount = 0;
-    locker.on(LockerEventKind.GarbageCycle, (garbageCycle: LockerEventMap[LockerEventKind.GarbageCycle]) => {
-      collectedCount += garbageCycle.collectedCount;
-      refreshedCount += garbageCycle.refreshedCount;
-    });
+    locker.on(
+      LockerEventKind.GarbageCycle,
+      (garbageCycle: LockerEventMap[LockerEventKind.GarbageCycle]) => {
+        collectedCount += garbageCycle.collectedCount;
+        refreshedCount += garbageCycle.refreshedCount;
+      },
+    );
 
     const firstLockName: LockName = 'my-gc-works';
     const secondLockName: LockName = 'my-gc-still-works';
@@ -70,10 +73,13 @@ export function testAdapter(adapter: () => AdapterInterface): void {
 
     let collectedCount = 0;
     let refreshedCount = 0;
-    locker.on(LockerEventKind.GarbageCycle, (garbageCycle: LockerEventMap[LockerEventKind.GarbageCycle]) => {
-      collectedCount += garbageCycle.collectedCount;
-      refreshedCount += garbageCycle.refreshedCount;
-    });
+    locker.on(
+      LockerEventKind.GarbageCycle,
+      (garbageCycle: LockerEventMap[LockerEventKind.GarbageCycle]) => {
+        collectedCount += garbageCycle.collectedCount;
+        refreshedCount += garbageCycle.refreshedCount;
+      },
+    );
 
     const firstLockName: LockName = 'my-gc-has-collected-locks';
     const secondLockName: LockName = 'my-gc-has-collected-other-locks';
@@ -114,20 +120,26 @@ export function testAdapter(adapter: () => AdapterInterface): void {
 
   it('works as expected', async done => {
     locker
-      .on(LockerEventKind.AcquiredLock, (lock: LockerEventMap[LockerEventKind.AcquiredLock]) => {
-        expect(lock).toBeInstanceOf(Lock);
-        expect(lock.status).toBe(LockStatus.Acquired);
-        expect(lock.settledAt).toBeInstanceOf(Date);
-        expect(lock.settledIn).toEqual(expect.any(Number));
-      })
-      .on(LockerEventKind.ReleasedLock, (lock: LockerEventMap[LockerEventKind.ReleasedLock]) => {
-        expect(lock).toBeInstanceOf(Lock);
-        expect(lock.status).toBe(LockStatus.Released);
-        expect(lock.settledAt).toBeInstanceOf(Date);
-        expect(lock.settledIn).toEqual(expect.any(Number));
-        expect(lock.releasedAt).toBeInstanceOf(Date);
-        expect(lock.acquiredFor).toEqual(expect.any(Number));
-      });
+      .on(
+        LockerEventKind.AcquiredLock,
+        (lock: LockerEventMap[LockerEventKind.AcquiredLock]) => {
+          expect(lock).toBeInstanceOf(Lock);
+          expect(lock.status).toBe(LockStatus.Acquired);
+          expect(lock.settledAt).toBeInstanceOf(Date);
+          expect(lock.settledIn).toEqual(expect.any(Number));
+        },
+      )
+      .on(
+        LockerEventKind.ReleasedLock,
+        (lock: LockerEventMap[LockerEventKind.ReleasedLock]) => {
+          expect(lock).toBeInstanceOf(Lock);
+          expect(lock.status).toBe(LockStatus.Released);
+          expect(lock.settledAt).toBeInstanceOf(Date);
+          expect(lock.settledIn).toEqual(expect.any(Number));
+          expect(lock.releasedAt).toBeInstanceOf(Date);
+          expect(lock.acquiredFor).toEqual(expect.any(Number));
+        },
+      );
 
     const lockName: LockName = 'my-lock';
 
@@ -140,7 +152,9 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     expect(locker.lockSet.size).toBe(2);
 
     // The "write" has to wait for the release of the 2 reads (so the timeout is reached and an error is triggered)
-    await expect(locker.lockAsWriter(lockName, { acquireTimeout: 100 })).rejects.toThrow(AcquireTimeoutLockError);
+    await expect(
+      locker.lockAsWriter(lockName, { acquireTimeout: 100 }),
+    ).rejects.toThrow(AcquireTimeoutLockError);
 
     // 2 locks still are now registered
     expect(locker.lockSet.size).toBe(2);
@@ -157,7 +171,10 @@ export function testAdapter(adapter: () => AdapterInterface): void {
   it('works as expected for concurrency', async done => {
     const lockName: LockName = 'my-another-lock';
 
-    async function getConcurrency(concurrentLockSet: LockSet, lock: Lock): Promise<number> {
+    async function getConcurrency(
+      concurrentLockSet: LockSet,
+      lock: Lock,
+    ): Promise<number> {
       concurrentLockSet.add(lock);
       const concurrency = concurrentLockSet.size;
       await sleep(Math.floor(100 + Math.random() * 400));
@@ -166,7 +183,9 @@ export function testAdapter(adapter: () => AdapterInterface): void {
       return concurrency;
     }
 
-    async function getMaxConcurrency(tasks: Promise<number>[]): Promise<number> {
+    async function getMaxConcurrency(
+      tasks: Promise<number>[],
+    ): Promise<number> {
       return Math.max(...((await Promise.all(tasks)) as any));
     }
 
@@ -175,11 +194,21 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     await expect(
       getMaxConcurrency([
         // 5 "read" tasks that run concurrently
-        locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
-        locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
-        locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
-        locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
-        locker.ensureReadingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
+        locker.ensureReadingTaskConcurrency(lockName, async lock =>
+          getConcurrency(concurrentLockSet, lock),
+        ),
+        locker.ensureReadingTaskConcurrency(lockName, async lock =>
+          getConcurrency(concurrentLockSet, lock),
+        ),
+        locker.ensureReadingTaskConcurrency(lockName, async lock =>
+          getConcurrency(concurrentLockSet, lock),
+        ),
+        locker.ensureReadingTaskConcurrency(lockName, async lock =>
+          getConcurrency(concurrentLockSet, lock),
+        ),
+        locker.ensureReadingTaskConcurrency(lockName, async lock =>
+          getConcurrency(concurrentLockSet, lock),
+        ),
       ]),
     ).resolves.toBe(5);
 
@@ -188,8 +217,12 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     await expect(
       getMaxConcurrency([
         // 2 "write" tasks that run serially
-        locker.ensureWritingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
-        locker.ensureWritingTaskConcurrency(lockName, async lock => getConcurrency(concurrentLockSet, lock)),
+        locker.ensureWritingTaskConcurrency(lockName, async lock =>
+          getConcurrency(concurrentLockSet, lock),
+        ),
+        locker.ensureWritingTaskConcurrency(lockName, async lock =>
+          getConcurrency(concurrentLockSet, lock),
+        ),
       ]),
     ).resolves.toBe(1);
 
