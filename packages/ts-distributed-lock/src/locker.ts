@@ -44,10 +44,16 @@ export class Locker extends EventEmitter {
   protected gcInterval: number | null;
   protected gcIntervalId?: ReturnType<typeof setInterval>;
 
-  public constructor(readonly adapter: AdapterInterface, readonly options: Partial<LockerOptions> = {}) {
+  public constructor(
+    readonly adapter: AdapterInterface,
+    readonly options: Partial<LockerOptions> = {},
+  ) {
     super();
 
-    this.gcInterval = adapter.gc && options.gc !== null ? Math.max(1, options.gc || 60000) : null;
+    this.gcInterval =
+      adapter.gc && options.gc !== null
+        ? Math.max(1, options.gc || 60000)
+        : null;
   }
 
   public async gc(): Promise<GarbageCycle | undefined> {
@@ -123,7 +129,11 @@ export class Locker extends EventEmitter {
     await Promise.all([...locks].map(lock => this.release(lock)));
   }
 
-  protected async lock(name: LockName, as: LockType, options: Partial<LockOptions> = {}): Promise<AcquiredLock> {
+  protected async lock(
+    name: LockName,
+    as: LockType,
+    options: Partial<LockOptions> = {},
+  ): Promise<AcquiredLock> {
     const lock = new Lock(name, as, options);
     this.lockSet.add(lock);
     this.enableGc();
@@ -133,7 +143,10 @@ export class Locker extends EventEmitter {
         const acquireTimeout = lock.options.acquireTimeout;
         const acquireTimeoutId =
           acquireTimeout != null && acquireTimeout > 0
-            ? setTimeout(() => reject(new AcquireTimeoutLockError(lock, acquireTimeout)), acquireTimeout)
+            ? setTimeout(
+                () => reject(new AcquireTimeoutLockError(lock, acquireTimeout)),
+                acquireTimeout,
+              )
             : undefined;
 
         try {
@@ -141,7 +154,13 @@ export class Locker extends EventEmitter {
 
           lock.isAcquired()
             ? resolve(lock)
-            : reject(lock.reason || new LockError(lock, `The lock "${lock}" has not been acquired`));
+            : reject(
+                lock.reason ||
+                  new LockError(
+                    lock,
+                    `The lock "${lock}" has not been acquired`,
+                  ),
+              );
         } catch (error) {
           reject(error);
         } finally {
@@ -152,7 +171,12 @@ export class Locker extends EventEmitter {
       this.lockSet.delete(lock);
 
       lock.reject(
-        error instanceof LockError ? error : new LockError(lock, `The lock "${lock}" has not been acquired: ${error}`),
+        error instanceof LockError
+          ? error
+          : new LockError(
+              lock,
+              `The lock "${lock}" has not been acquired: ${error}`,
+            ),
       );
 
       throw lock.reason;
@@ -180,7 +204,10 @@ export class Locker extends EventEmitter {
     }
   }
 
-  public async lockAsWriter(name: LockName, options?: Partial<LockOptions>): Promise<Lock> {
+  public async lockAsWriter(
+    name: LockName,
+    options?: Partial<LockOptions>,
+  ): Promise<Lock> {
     return this.lock(name, LockType.Writer, options);
   }
 
@@ -192,7 +219,10 @@ export class Locker extends EventEmitter {
     return this.ensureTaskConcurrency(name, task, LockType.Writer, options);
   }
 
-  public async lockAsReader(name: LockName, options?: Partial<LockOptions>): Promise<Lock> {
+  public async lockAsReader(
+    name: LockName,
+    options?: Partial<LockOptions>,
+  ): Promise<Lock> {
     return this.lock(name, LockType.Reader, options);
   }
 

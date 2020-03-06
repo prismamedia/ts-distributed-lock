@@ -33,7 +33,9 @@ export type LockOptions = {
   pullInterval: number | null;
 };
 
-export interface SettledLock<TStatus extends LockStatus.Acquired | LockStatus.Rejected> extends Lock {
+export interface SettledLock<
+  TStatus extends LockStatus.Acquired | LockStatus.Rejected
+> extends Lock {
   settledAt: Date;
   settledIn: number;
   status: TStatus;
@@ -65,7 +67,11 @@ export class Lock {
   private _acquiredFor?: number;
   public reason?: LockError;
 
-  public constructor(readonly name: LockName, type: LockType, readonly options: Partial<LockOptions> = {}) {
+  public constructor(
+    readonly name: LockName,
+    type: LockType,
+    readonly options: Partial<LockOptions> = {},
+  ) {
     this._id = uniqid();
     this._type = type;
     this._status = LockStatus.Acquiring;
@@ -114,28 +120,41 @@ export class Lock {
   }
 
   public toString(): string {
-    return `${this.name}/${this._id} (${LockType[this._type]} - ${LockStatus[this._status]})`;
+    return `${this.name}/${this._id} (${LockType[this._type]} - ${
+      LockStatus[this._status]
+    })`;
   }
 
   public set status(status: LockStatus) {
     if (
       !(
-        (this._status === LockStatus.Acquiring && (status === LockStatus.Acquired || status === LockStatus.Rejected)) ||
-        (this._status === LockStatus.Acquired && (status === LockStatus.Releasing || status === LockStatus.Released)) ||
-        (this._status === LockStatus.Releasing && status === LockStatus.Released)
+        (this._status === LockStatus.Acquiring &&
+          (status === LockStatus.Acquired || status === LockStatus.Rejected)) ||
+        (this._status === LockStatus.Acquired &&
+          (status === LockStatus.Releasing ||
+            status === LockStatus.Released)) ||
+        (this._status === LockStatus.Releasing &&
+          status === LockStatus.Released)
       )
     ) {
       throw new WorkflowLockError(this, status);
-    } else if (status === LockStatus.Acquired || status === LockStatus.Rejected) {
+    } else if (
+      status === LockStatus.Acquired ||
+      status === LockStatus.Rejected
+    ) {
       this._settledAt = new Date();
       this._settledIn = this._settledAt.getTime() - this._createdAt.getTime();
     } else if (status === LockStatus.Released) {
       if (!this._settledAt) {
-        throw new LockError(this, `Logic error: "${this}" has to be settled for being released`);
+        throw new LockError(
+          this,
+          `Logic error: "${this}" has to be settled for being released`,
+        );
       }
 
       this._releasedAt = new Date();
-      this._acquiredFor = this._releasedAt.getTime() - this._settledAt.getTime();
+      this._acquiredFor =
+        this._releasedAt.getTime() - this._settledAt.getTime();
     }
 
     this._status = status;
@@ -174,7 +193,10 @@ export class Lock {
   public get acquireTimeout(): number | undefined {
     if (this.options.acquireTimeout != null) {
       if (this.options.acquireTimeout <= 0) {
-        throw new LockError(this, `The lock "${this}"'s "acquireTimeout" option has to be greater than 0`);
+        throw new LockError(
+          this,
+          `The lock "${this}"'s "acquireTimeout" option has to be greater than 0`,
+        );
       }
 
       return this.options.acquireTimeout;
@@ -187,7 +209,10 @@ export class Lock {
   public get pullInterval(): number {
     if (this.options.pullInterval != null) {
       if (this.options.pullInterval <= 0) {
-        throw new LockError(this, `The lock "${this}"'s "pullInterval" option has to be greater than 0`);
+        throw new LockError(
+          this,
+          `The lock "${this}"'s "pullInterval" option has to be greater than 0`,
+        );
       }
 
       return this.options.pullInterval;

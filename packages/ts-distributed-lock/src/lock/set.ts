@@ -2,7 +2,9 @@ import { Lock, LockId, LockName, LockStatus, LockType } from '../lock';
 
 export class LockSet extends Set<Lock> {
   public filter(filter: (value: Lock, index: number) => boolean): this {
-    return new (this.constructor as typeof LockSet)([...this].filter(filter)) as this;
+    return new (this.constructor as typeof LockSet)(
+      [...this].filter(filter),
+    ) as this;
   }
 
   public filterByName(name: LockName): this {

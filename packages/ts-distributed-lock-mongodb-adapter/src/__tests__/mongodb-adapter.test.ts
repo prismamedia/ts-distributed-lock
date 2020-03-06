@@ -9,9 +9,15 @@ describe('MongoDBAdapter', () => {
 
     const mongodbUrl = process.env.MONGODB_URL;
 
-    expect(new MongoDBAdapter(mongodbUrl, { serverVersion: '3' })).toBeInstanceOf(MongoDBAdapter);
-    expect(new MongoDBAdapter(mongodbUrl, { serverVersion: '3.2' })).toBeInstanceOf(MongoDBAdapter);
-    expect(new MongoDBAdapter(mongodbUrl, { serverVersion: '3.2.4' })).toBeInstanceOf(MongoDBAdapter);
+    expect(
+      new MongoDBAdapter(mongodbUrl, { serverVersion: '3' }),
+    ).toBeInstanceOf(MongoDBAdapter);
+    expect(
+      new MongoDBAdapter(mongodbUrl, { serverVersion: '3.2' }),
+    ).toBeInstanceOf(MongoDBAdapter);
+    expect(
+      new MongoDBAdapter(mongodbUrl, { serverVersion: '3.2.4' }),
+    ).toBeInstanceOf(MongoDBAdapter);
   });
 
   testAdapter(() => {

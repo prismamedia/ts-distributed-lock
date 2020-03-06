@@ -12,11 +12,21 @@ import {
   LockType,
   sleep,
 } from '@prismamedia/ts-distributed-lock';
-import { Admin, Collection, Db, IndexSpecification, MongoClient, MongoError, ReadPreference } from 'mongodb';
+import {
+  Admin,
+  Collection,
+  Db,
+  IndexSpecification,
+  MongoClient,
+  MongoError,
+  ReadPreference,
+} from 'mongodb';
 import semver, { SemVer } from 'semver';
 import { Memoize } from 'typescript-memoize';
 
-type NamedIndexSpecification = IndexSpecification & { name: NonNullable<IndexSpecification['name']> };
+type NamedIndexSpecification = IndexSpecification & {
+  name: NonNullable<IndexSpecification['name']>;
+};
 
 type Document = {
   name: LockName;
@@ -41,7 +51,10 @@ export class MongoDBAdapter implements AdapterInterface {
   protected collectionName: string;
   protected serverVersion?: SemVer;
 
-  public constructor(urlOrClient: string | MongoClient, protected options: Partial<MongoDBAdapterOptions> = {}) {
+  public constructor(
+    urlOrClient: string | MongoClient,
+    protected options: Partial<MongoDBAdapterOptions> = {},
+  ) {
     this.client =
       urlOrClient instanceof MongoClient
         ? urlOrClient
@@ -56,7 +69,9 @@ export class MongoDBAdapter implements AdapterInterface {
     if (typeof options.serverVersion !== 'undefined') {
       const coercedServerVersion = semver.coerce(options.serverVersion);
       if (!(semver.valid(coercedServerVersion) && coercedServerVersion)) {
-        throw new LockerError(`The provided "serverVersion" is not a valid semantic version: ${options.serverVersion}`);
+        throw new LockerError(
+          `The provided "serverVersion" is not a valid semantic version: ${options.serverVersion}`,
+        );
       }
 
       this.serverVersion = coercedServerVersion;
@@ -94,7 +109,9 @@ export class MongoDBAdapter implements AdapterInterface {
 
     const coercedServerVersion = semver.coerce(serverVersion);
     if (!(semver.valid(coercedServerVersion) && coercedServerVersion)) {
-      throw new LockerError(`The returned "serverVersion" is not a valid semantic version: ${serverVersion}`);
+      throw new LockerError(
+        `The returned "serverVersion" is not a valid semantic version: ${serverVersion}`,
+      );
     }
 
     return coercedServerVersion;
@@ -105,16 +122,25 @@ export class MongoDBAdapter implements AdapterInterface {
     const db = await this.getDb();
 
     return new Promise((resolve, reject) =>
-      db.collection(this.collectionName, { strict: true }, (error, collection) =>
-        error ? reject(error) : resolve(collection),
+      db.collection(
+        this.collectionName,
+        { strict: true },
+        (error, collection) => (error ? reject(error) : resolve(collection)),
       ),
     );
   }
 
-  public async gc({ lockSet, at, staleAt }: AdapterGarbageCollectorParams): Promise<GarbageCycle> {
+  public async gc({
+    lockSet,
+    at,
+    staleAt,
+  }: AdapterGarbageCollectorParams): Promise<GarbageCycle> {
     const collection = await this.getCollection();
 
-    const [{ modifiedCount: collectedCount }, { modifiedCount: refreshedCount = 0 }] = await Promise.all([
+    const [
+      { modifiedCount: collectedCount },
+      { modifiedCount: refreshedCount = 0 },
+    ] = await Promise.all([
       // We delete the locks not refreshed soon enought
       collection.updateMany({}, { $pull: { queue: { at: { $lt: staleAt } } } }),
 
@@ -153,7 +179,11 @@ export class MongoDBAdapter implements AdapterInterface {
     ];
 
     if (gcInterval) {
-      indices.push({ name: 'idx_at', key: { at: 1 }, expireAfterSeconds: Math.ceil((gcInterval * 2) / 1000) });
+      indices.push({
+        name: 'idx_at',
+        key: { at: 1 },
+        expireAfterSeconds: Math.ceil((gcInterval * 2) / 1000),
+      });
     }
 
     const db = await this.getDb();
@@ -184,7 +214,10 @@ export class MongoDBAdapter implements AdapterInterface {
     await collection.deleteMany({});
   }
 
-  protected async enqueueLock(lock: Lock, tries: number = 3): Promise<Document> {
+  protected async enqueueLock(
+    lock: Lock,
+    tries: number = 3,
+  ): Promise<Document> {
     const collection = await this.getCollection();
     const at = new Date();
 
@@ -211,7 +244,10 @@ export class MongoDBAdapter implements AdapterInterface {
       if (error instanceof MongoError && error.code === 11000 && tries > 1) {
         return this.enqueueLock(lock, tries - 1);
       } else {
-        throw new LockError(lock, `The lock "${lock}" has not been enqueued: ${error.message}`);
+        throw new LockError(
+          lock,
+          `The lock "${lock}" has not been enqueued: ${error.message}`,
+        );
       }
     }
   }
@@ -219,14 +255,20 @@ export class MongoDBAdapter implements AdapterInterface {
   protected async dequeueLock(lock: Lock): Promise<boolean> {
     const collection = await this.getCollection();
 
-    const { modifiedCount } = await collection.updateOne({ name: lock.name }, { $pull: { queue: { id: lock.id } } });
+    const { modifiedCount } = await collection.updateOne(
+      { name: lock.name },
+      { $pull: { queue: { id: lock.id } } },
+    );
 
     return modifiedCount === 1;
   }
 
   protected isLockAcquired(lock: Lock, document: Document | null): boolean {
     if (!document) {
-      throw new LockError(lock, `The lock "${lock}" is not in the queue anymore`);
+      throw new LockError(
+        lock,
+        `The lock "${lock}" is not in the queue anymore`,
+      );
     }
 
     const acquired =
@@ -234,7 +276,9 @@ export class MongoDBAdapter implements AdapterInterface {
         ? // A "write" lock is acquired when it's the first in the queue
           document.queue[0]?.id === lock.id
         : // A "read" lock is acquired when it's not preceded by a "write" lock in the queue
-          document.queue.find(({ id, type }) => id === lock.id || type === LockType.Writer)?.id === lock.id;
+          document.queue.find(
+            ({ id, type }) => id === lock.id || type === LockType.Writer,
+          )?.id === lock.id;
 
     if (acquired) {
       lock.status = LockStatus.Acquired;
@@ -258,7 +302,10 @@ export class MongoDBAdapter implements AdapterInterface {
           lock.isAcquiring() &&
           !this.isLockAcquired(
             lock,
-            await collection.findOne({ 'queue.id': lock.id }, { readPreference: ReadPreference.PRIMARY }),
+            await collection.findOne(
+              { 'queue.id': lock.id },
+              { readPreference: ReadPreference.PRIMARY },
+            ),
           )
         ) {
           // Nothing to do here
@@ -273,7 +320,10 @@ export class MongoDBAdapter implements AdapterInterface {
 
   public async release(lock: Lock) {
     if (!(await this.dequeueLock(lock))) {
-      throw new LockError(lock, `The lock "${lock}" was not in the queue anymore`);
+      throw new LockError(
+        lock,
+        `The lock "${lock}" was not in the queue anymore`,
+      );
     }
 
     lock.status = LockStatus.Released;

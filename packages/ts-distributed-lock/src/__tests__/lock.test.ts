@@ -7,9 +7,15 @@ describe('Lock', () => {
     expect(lock.status).toBe(LockStatus.Acquiring);
 
     // Can only set as "Acquired" or "Rejected"
-    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Releasing)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Released)).toThrowError(WorkflowLockError);
+    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Releasing)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Released)).toThrowError(
+      WorkflowLockError,
+    );
 
     // Not changed
     expect(lock.status).toBe(LockStatus.Acquiring);
@@ -24,11 +30,21 @@ describe('Lock', () => {
     expect(lock.settledIn).toBeGreaterThanOrEqual(0);
 
     // Cannot be changed
-    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Acquired)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Releasing)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Released)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Rejected)).toThrowError(WorkflowLockError);
+    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Acquired)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Releasing)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Released)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Rejected)).toThrowError(
+      WorkflowLockError,
+    );
   });
 
   it('has a proper worflow for acquired locks', () => {
@@ -40,18 +56,32 @@ describe('Lock', () => {
     expect(lock.settledIn).toBeGreaterThanOrEqual(0);
 
     // Can only set as "Releasing" or "Released"
-    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Acquired)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Rejected)).toThrowError(WorkflowLockError);
+    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Acquired)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Rejected)).toThrowError(
+      WorkflowLockError,
+    );
 
     lock.status = LockStatus.Releasing;
     expect(lock.status).toBe(LockStatus.Releasing);
 
     // Can only set as "Released"
-    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Acquired)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Releasing)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Rejected)).toThrowError(WorkflowLockError);
+    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Acquired)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Releasing)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Rejected)).toThrowError(
+      WorkflowLockError,
+    );
 
     lock.status = LockStatus.Released;
     expect(lock.status).toBe(LockStatus.Released);
@@ -59,10 +89,20 @@ describe('Lock', () => {
     expect(lock.acquiredFor).toBeGreaterThanOrEqual(0);
 
     // Cannot be changed
-    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Acquired)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Releasing)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Released)).toThrowError(WorkflowLockError);
-    expect(() => (lock.status = LockStatus.Rejected)).toThrowError(WorkflowLockError);
+    expect(() => (lock.status = LockStatus.Acquiring)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Acquired)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Releasing)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Released)).toThrowError(
+      WorkflowLockError,
+    );
+    expect(() => (lock.status = LockStatus.Rejected)).toThrowError(
+      WorkflowLockError,
+    );
   });
 });
