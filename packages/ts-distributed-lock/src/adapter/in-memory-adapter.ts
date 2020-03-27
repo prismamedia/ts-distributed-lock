@@ -24,7 +24,7 @@ export class InMemoryAdapter implements AdapterInterface {
     let collectedCount: number = 0;
     let refreshedCount: number = 0;
 
-    this.storage.forEach(queue =>
+    this.storage.forEach((queue) =>
       queue.forEach((at, lock) => {
         // We delete the locks not refreshed soon enought
         if (at < staleAt && queue.delete(lock)) {
@@ -33,7 +33,7 @@ export class InMemoryAdapter implements AdapterInterface {
       }),
     );
 
-    lockSet.forEach(lock => {
+    lockSet.forEach((lock) => {
       const queue = this.storage.get(lock.name);
       if (queue && queue.has(lock) && queue.set(lock, at)) {
         refreshedCount++;
@@ -42,8 +42,9 @@ export class InMemoryAdapter implements AdapterInterface {
 
     if (refreshedCount !== lockSet.size) {
       throw new LockerError(
-        `The garbage collecting cycle missed ${lockSet.size -
-          refreshedCount} lock(s)`,
+        `The garbage collecting cycle missed ${
+          lockSet.size - refreshedCount
+        } lock(s)`,
       );
     }
 
@@ -72,7 +73,7 @@ export class InMemoryAdapter implements AdapterInterface {
         // A "read" lock is acquired when it's not preceded by a "write" lock in the queue
         if (
           [...queue.keys()].find(
-            lockInSet =>
+            (lockInSet) =>
               lockInSet === lock || lockInSet.type === LockType.Writer,
           ) === lock
         ) {

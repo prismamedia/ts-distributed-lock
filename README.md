@@ -56,15 +56,21 @@ Or with some helpers that ensure the lock is released
 // ./usage.ts
 import { locker } from './locker';
 
-const firstTaskResult = await locker.ensureReadingTaskConcurrency('my-lock-name', async () => {
-  // Everything I have to do ...
+const firstTaskResult = await locker.ensureReadingTaskConcurrency(
+  'my-lock-name',
+  async () => {
+    // Everything I have to do ...
 
-  return 'myFirstTaskResult';
-});
+    return 'myFirstTaskResult';
+  },
+);
 
-const secondTaskResult = await locker.ensureWritingTaskConcurrency('my-lock-name', async () => {
-  // Everything I have to do ...
+const secondTaskResult = await locker.ensureWritingTaskConcurrency(
+  'my-lock-name',
+  async () => {
+    // Everything I have to do ...
 
-  return 'mySecondTaskResult';
-});
+    return 'mySecondTaskResult';
+  },
+);
 ```

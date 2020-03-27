@@ -15,12 +15,12 @@
     "build:clean": "tsc --build tsconfig.json tsconfig.esm.json --clean",
     "build:watch": "tsc --build tsconfig.json --watch",
     "clean": "git clean -dfqx -- .",
-    "prettier": "prettier --write \"./**/src/**/*.ts\"",
+    "prettier": "prettier --write .",
     "test": "lerna run --parallel test"
   },
   "devDependencies": {
     "lerna": "^3.20.2",
-    "prettier": "^1.19.1",
+    "prettier": "^2.0.2",
     "typescript": "^3.8.3"
   }
 }

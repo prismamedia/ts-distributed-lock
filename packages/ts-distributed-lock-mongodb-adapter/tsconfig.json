@@ -6,10 +6,5 @@
     "declarationDir": "dist/types",
     "module": "CommonJS",
     "outDir": "dist/cjs"
-  },
-  "references": [
-    {
-      "path": "../ts-distributed-lock"
-    }
-  ]
+  }
 }

@@ -126,7 +126,7 @@ export class Locker extends EventEmitter {
   }
 
   public async releaseMany(locks: Iterable<Lock>): Promise<void> {
-    await Promise.all([...locks].map(lock => this.release(lock)));
+    await Promise.all([...locks].map((lock) => this.release(lock)));
   }
 
   protected async lock(

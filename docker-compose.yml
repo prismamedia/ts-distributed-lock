@@ -9,7 +9,7 @@ services:
       options:
         max-size: 50k
         max-file: '1'
-    restart: on-failure
+    restart: 'unless-stopped'
 
   project:
     image: node:12
@@ -20,15 +20,16 @@ services:
       MONGODB_URL: mongodb://mongo:27017/ts-distributed-lock-tests
 
       YARN_CACHE_FOLDER: /var/cache/yarn
-    working_dir: /usr/src/app
+    working_dir: /workspace
     volumes:
-      - .:/usr/src/app:delegated
+      - .:/workspace:delegated
       - ~/.bash_history:/root/.bash_history
       - yarn_cache:/var/cache/yarn
     logging:
       options:
         max-size: 50k
         max-file: '1'
+    restart: 'no'
 
 volumes:
   yarn_cache: ~

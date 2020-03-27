@@ -147,7 +147,7 @@ export class MongoDBAdapter implements AdapterInterface {
       // We refresh the registered locks
       lockSet.size > 0
         ? collection.bulkWrite(
-            [...lockSet].map(lock => ({
+            [...lockSet].map((lock) => ({
               updateOne: {
                 filter: { 'queue.id': lock.id },
                 update: {
@@ -202,7 +202,10 @@ export class MongoDBAdapter implements AdapterInterface {
         }
       }),
       ...currentIndices.map(async ({ name }) => {
-        if (name !== '_id_' && !indices.find(indice => indice.name === name)) {
+        if (
+          name !== '_id_' &&
+          !indices.find((indice) => indice.name === name)
+        ) {
           await collection.dropIndex(name);
         }
       }),
