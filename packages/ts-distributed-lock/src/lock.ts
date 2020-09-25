@@ -1,5 +1,5 @@
-import { Memoize } from 'typescript-memoize';
-import uniqid from 'uniqid';
+import { Memoize } from '@prismamedia/ts-memoize';
+import crypto from 'crypto';
 import { LockError, WorkflowLockError } from './error';
 
 export * from './lock/set';
@@ -57,83 +57,83 @@ export interface ReleasedLock extends Lock {
 }
 
 export class Lock {
-  private _id: LockId;
-  private _type: LockType;
-  private _status: LockStatus;
-  private _createdAt: Date;
-  private _settledAt?: Date;
-  private _settledIn?: number;
-  private _releasedAt?: Date;
-  private _acquiredFor?: number;
-  public reason?: LockError;
+  #id: LockId;
+  #type: LockType;
+  #status: LockStatus;
+  #createdAt: Date;
+  #settledAt?: Date;
+  #settledIn?: number;
+  #releasedAt?: Date;
+  #acquiredFor?: number;
+  reason?: LockError;
 
   public constructor(
     readonly name: LockName,
     type: LockType,
     readonly options: Partial<LockOptions> = {},
   ) {
-    this._id = uniqid();
-    this._type = type;
-    this._status = LockStatus.Acquiring;
-    this._createdAt = new Date();
+    this.#id = crypto.randomBytes(4).toString('base64');
+    this.#type = type;
+    this.#status = LockStatus.Acquiring;
+    this.#createdAt = new Date();
   }
 
   public get id(): LockId {
-    return this._id;
+    return this.#id;
   }
 
   public get type(): LockType {
-    return this._type;
+    return this.#type;
   }
 
   public get status(): LockStatus {
-    return this._status;
+    return this.#status;
   }
 
   public get createdAt(): Date {
-    return this._createdAt;
+    return this.#createdAt;
   }
 
   /**
    * A lock is settled when it has been acquired or rejected
    */
   public get settledAt(): Date | undefined {
-    return this._settledAt;
+    return this.#settledAt;
   }
 
   /**
    * Time, in ms, took by this lock to be settled
    */
   public get settledIn(): number | undefined {
-    return this._settledIn;
+    return this.#settledIn;
   }
 
   public get releasedAt(): Date | undefined {
-    return this._releasedAt;
+    return this.#releasedAt;
   }
 
   /**
    * Time, in ms, this lock has been acquired
    */
   public get acquiredFor(): number | undefined {
-    return this._acquiredFor;
+    return this.#acquiredFor;
   }
 
   public toString(): string {
-    return `${this.name}/${this._id} (${LockType[this._type]} - ${
-      LockStatus[this._status]
+    return `${this.name}/${this.#id} (${LockType[this.#type]} - ${
+      LockStatus[this.#status]
     })`;
   }
 
   public set status(status: LockStatus) {
     if (
       !(
-        (this._status === LockStatus.Acquiring &&
+        (this.#status === LockStatus.Acquiring &&
           (status === LockStatus.Acquired || status === LockStatus.Rejected)) ||
-        (this._status === LockStatus.Acquired &&
+        (this.#status === LockStatus.Acquired &&
           (status === LockStatus.Releasing ||
             status === LockStatus.Released)) ||
-        (this._status === LockStatus.Releasing &&
+        (this.#status === LockStatus.Releasing &&
           status === LockStatus.Released)
       )
     ) {
@@ -142,46 +142,46 @@ export class Lock {
       status === LockStatus.Acquired ||
       status === LockStatus.Rejected
     ) {
-      this._settledAt = new Date();
-      this._settledIn = this._settledAt.getTime() - this._createdAt.getTime();
+      this.#settledAt = new Date();
+      this.#settledIn = this.#settledAt.getTime() - this.#createdAt.getTime();
     } else if (status === LockStatus.Released) {
-      if (!this._settledAt) {
+      if (!this.#settledAt) {
         throw new LockError(
           this,
           `Logic error: "${this}" has to be settled for being released`,
         );
       }
 
-      this._releasedAt = new Date();
-      this._acquiredFor =
-        this._releasedAt.getTime() - this._settledAt.getTime();
+      this.#releasedAt = new Date();
+      this.#acquiredFor =
+        this.#releasedAt.getTime() - this.#settledAt.getTime();
     }
 
-    this._status = status;
+    this.#status = status;
   }
 
   public isSettled(): boolean {
-    return typeof this._settledAt !== 'undefined';
+    return typeof this.#settledAt !== 'undefined';
   }
 
   public isAcquiring(): boolean {
-    return this._status === LockStatus.Acquiring;
+    return this.#status === LockStatus.Acquiring;
   }
 
   public isAcquired(): this is AcquiredLock {
-    return this._status === LockStatus.Acquired;
+    return this.#status === LockStatus.Acquired;
   }
 
   public isReleasing(): boolean {
-    return this._status === LockStatus.Releasing;
+    return this.#status === LockStatus.Releasing;
   }
 
   public isReleased(): this is ReleasedLock {
-    return this._status === LockStatus.Released;
+    return this.#status === LockStatus.Released;
   }
 
   public isRejected(): this is RejectedLock {
-    return this._status === LockStatus.Rejected;
+    return this.#status === LockStatus.Rejected;
   }
 
   public reject(reason: LockError): void {

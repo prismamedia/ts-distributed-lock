@@ -1,10 +1,9 @@
 {
-  "extends": "./tsconfig.base",
+  "extends": "../../tsconfig.base",
+  "references": [{ "path": "../ts-distributed-lock" }],
   "compilerOptions": {
-    "declaration": true,
-    "declarationMap": true,
-    "declarationDir": "dist/types",
-    "module": "CommonJS",
-    "outDir": "dist/cjs"
+    "rootDir": "src",
+    "outDir": "dist/cjs",
+    "declarationDir": "dist/types"
   }
 }

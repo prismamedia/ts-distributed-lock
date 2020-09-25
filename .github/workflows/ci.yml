@@ -3,8 +3,31 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  setup:
+  build-test-and-publish:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['12']
+        mongo: ['3.2']
+        # node: ['12', '14']
+        # mongo: ['3.2', '3.6']
+        include:
+          - node: '12'
+            mongo: '3.2'
+            publish: true
+            continue-on-error: false
+
+    continue-on-error: ${{ matrix.continue-on-error == true }}
+
+    container:
+      image: node:${{ matrix.node }}
+
+    services:
+      mongodb:
+        image: mongo:${{ matrix.mongo }}
+        ports: [27017]
 
     steps:
       - name: Checkout the code
@@ -12,131 +35,34 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Setup node v12
-        uses: actions/setup-node@v1
-        with:
-          node-version: 12
+      - name: Setup Yarn berry
+        run: yarn set version berry
 
-      - name: Cache yarn
-        uses: actions/cache@v1
-        with:
-          path: ~/.cache/yarn
-          key: ${{ runner.OS }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.OS }}-yarn-
+      - name: Validate dependencies
+        run: yarn install --immutable --immutable-cache
 
-      - name: Install dependencies
-        run: yarn install --no-progress --non-interactive --frozen-lockfile
-
-      - name: Create workspace artifact
-        run: touch workspace.tar.gz && tar --exclude=workspace.tar.gz -czf workspace.tar.gz .
-
-      - name: Save workspace
-        uses: actions/upload-artifact@v1
-        with:
-          name: workspace
-          path: workspace.tar.gz
-
-  build-and-test-ts-distributed-lock:
-    needs: setup
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        package: ['ts-distributed-lock']
-        node: ['12', '13']
-
-    steps:
-      - name: Download workspace
-        uses: actions/download-artifact@v1
-        with:
-          name: workspace
-          path: .
-
-      - name: Restore workspace
-        run: tar -xzf workspace.tar.gz
-
-      - name: Setup node v${{ matrix.node }}
-        uses: actions/setup-node@v1
-        with:
-          node-version: ${{ matrix.node }}
-
-      - name: Build
-        run: cd packages/${{ matrix.package }} && yarn run build
-
-      - name: Test
-        run: cd packages/${{ matrix.package }} && yarn run test
-
-  build-and-test-ts-distributed-lock-mongodb-adapter:
-    needs: setup
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        package: ['ts-distributed-lock-mongodb-adapter']
-        node: ['12', '13']
-        mongo: ['3.2', '3.6']
-
-    services:
-      mongo:
-        image: mongo:${{ matrix.mongo }}
-        ports:
-          - 27017/tcp
-
-    steps:
-      - name: Download workspace
-        uses: actions/download-artifact@v1
-        with:
-          name: workspace
-          path: .
-
-      - name: Restore workspace
-        run: tar -xzf workspace.tar.gz
-
-      - name: Setup node v${{ matrix.node }}
-        uses: actions/setup-node@v1
-        with:
-          node-version: ${{ matrix.node }}
-
-      - name: Build
-        run: cd packages/${{ matrix.package }} && yarn run build
-
-      - name: Test
-        run: cd packages/${{ matrix.package }} && yarn run test
-        env:
-          MONGODB_URL: mongodb://localhost:${{ job.services.mongo.ports[27017] }}/${{ matrix.package }}
-
-  build-and-publish:
-    if: "startsWith(github.ref, 'refs/tags/')"
-    needs:
-      [
-        'build-and-test-ts-distributed-lock',
-        'build-and-test-ts-distributed-lock-mongodb-adapter',
-      ]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download workspace
-        uses: actions/download-artifact@v1
-        with:
-          name: workspace
-          path: .
-
-      - name: Restore workspace
-        run: tar -xzf workspace.tar.gz
-
-      - name: Setup node v12
-        uses: actions/setup-node@v1
-        with:
-          node-version: 12
-
-      - name: Build
-        run: yarn build
-
-      - name: Publish to npmjs
+      - name: Import Yarn plugins
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NPM_REGISTRY_AUTH_TOKEN}" > .npmrc
-          yarn run lerna publish from-git --yes --no-git-reset --registry https://registry.npmjs.org/
+          yarn plugin import @yarnpkg/plugin-workspace-tools
+
+      - name: Build
+        run: yarn run build
+
+      - name: Test
+        run: yarn run test
         env:
-          CI: true
-          NPM_REGISTRY_AUTH_TOKEN: ${{ secrets.NPM_REGISTRY_AUTH_TOKEN }}
+          MONGODB_URL: mongodb://127.0.0.1:${{ job.services.mongodb.ports[27017] }}/ts-distributed-lock-tests
+
+      - name: Publish "ts-distributed-lock" to npmjs
+        if: "matrix.publish == true && startsWith(github.ref, 'refs/tags/')"
+        working-directory: packages/ts-distributed-lock
+        run: yarn npm publish --tolerate-republish
+        env:
+          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_REGISTRY_AUTH_TOKEN }}
+
+      - name: Publish "ts-distributed-lock-mongodb-adapter" to npmjs
+        if: "matrix.publish == true && startsWith(github.ref, 'refs/tags/')"
+        working-directory: packages/ts-distributed-lock-mongodb-adapter
+        run: yarn npm publish --tolerate-republish
+        env:
+          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_REGISTRY_AUTH_TOKEN }}

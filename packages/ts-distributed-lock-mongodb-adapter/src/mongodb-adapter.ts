@@ -12,6 +12,7 @@ import {
   LockType,
   sleep,
 } from '@prismamedia/ts-distributed-lock';
+import { Memoize } from '@prismamedia/ts-memoize';
 import {
   Admin,
   Collection,
@@ -22,7 +23,6 @@ import {
   ReadPreference,
 } from 'mongodb';
 import semver, { SemVer } from 'semver';
-import { Memoize } from 'typescript-memoize';
 
 type NamedIndexSpecification = IndexSpecification & {
   name: NonNullable<IndexSpecification['name']>;
@@ -47,15 +47,15 @@ export type MongoDBAdapterOptions = {
 };
 
 export class MongoDBAdapter implements AdapterInterface {
-  protected client: MongoClient;
-  protected collectionName: string;
-  protected serverVersion?: SemVer;
+  #client: MongoClient;
+  #collectionName: string;
+  #serverVersion?: SemVer;
 
   public constructor(
     urlOrClient: string | MongoClient,
     protected options: Partial<MongoDBAdapterOptions> = {},
   ) {
-    this.client =
+    this.#client =
       urlOrClient instanceof MongoClient
         ? urlOrClient
         : new MongoClient(urlOrClient, {
@@ -64,7 +64,7 @@ export class MongoDBAdapter implements AdapterInterface {
             validateOptions: true,
           });
 
-    this.collectionName = options.collectionName || 'locks';
+    this.#collectionName = options.collectionName || 'locks';
 
     if (typeof options.serverVersion !== 'undefined') {
       const coercedServerVersion = semver.coerce(options.serverVersion);
@@ -74,13 +74,13 @@ export class MongoDBAdapter implements AdapterInterface {
         );
       }
 
-      this.serverVersion = coercedServerVersion;
+      this.#serverVersion = coercedServerVersion;
     }
   }
 
   protected async connect(): Promise<void> {
-    if (!this.client.isConnected()) {
-      await this.client.connect();
+    if (!this.#client.isConnected()) {
+      await this.#client.connect();
     }
   }
 
@@ -88,7 +88,7 @@ export class MongoDBAdapter implements AdapterInterface {
   protected async getDb(): Promise<Db> {
     await this.connect();
 
-    return this.client.db();
+    return this.#client.db();
   }
 
   @Memoize()
@@ -100,8 +100,8 @@ export class MongoDBAdapter implements AdapterInterface {
 
   @Memoize()
   protected async getServerVersion(): Promise<SemVer> {
-    if (this.serverVersion) {
-      return this.serverVersion;
+    if (this.#serverVersion) {
+      return this.#serverVersion;
     }
 
     const admin = await this.getAdmin();
@@ -123,7 +123,7 @@ export class MongoDBAdapter implements AdapterInterface {
 
     return new Promise((resolve, reject) =>
       db.collection(
-        this.collectionName,
+        this.#collectionName,
         { strict: true },
         (error, collection) => (error ? reject(error) : resolve(collection)),
       ),
@@ -182,12 +182,21 @@ export class MongoDBAdapter implements AdapterInterface {
       indices.push({
         name: 'idx_at',
         key: { at: 1 },
-        expireAfterSeconds: Math.ceil((gcInterval * 2) / 1000),
+        expireAfterSeconds: Math.ceil((gcInterval * 3) / 1000),
       });
     }
 
     const db = await this.getDb();
-    await db.createCollection(this.collectionName);
+
+    try {
+      await db.createCollection(this.#collectionName);
+    } catch (error) {
+      if (!(error instanceof MongoError && error.code === 48)) {
+        throw error;
+      }
+
+      // Do nothing, the collection already axists
+    }
 
     const collection = await this.getCollection();
     const currentIndices = await collection.listIndexes().toArray();

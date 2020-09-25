@@ -1,6 +1,6 @@
+import { Memoize } from '@prismamedia/ts-memoize';
 import { EventEmitter } from 'events';
 import { setInterval } from 'timers';
-import { Memoize } from 'typescript-memoize';
 import { AdapterInterface, GarbageCycle } from './adapter';
 import { AcquireTimeoutLockError, LockError } from './error';
 import {
@@ -41,8 +41,8 @@ export type LockerOptions = {
 export class Locker extends EventEmitter {
   readonly lockSet = new LockSet();
 
-  protected gcInterval: number | null;
-  protected gcIntervalId?: ReturnType<typeof setInterval>;
+  #gcInterval: number | null;
+  #gcIntervalId?: ReturnType<typeof setInterval>;
 
   public constructor(
     readonly adapter: AdapterInterface,
@@ -50,20 +50,20 @@ export class Locker extends EventEmitter {
   ) {
     super();
 
-    this.gcInterval =
+    this.#gcInterval =
       adapter.gc && options.gc !== null
         ? Math.max(1, options.gc || 60000)
         : null;
   }
 
   public async gc(): Promise<GarbageCycle | undefined> {
-    if (this.adapter.gc && this.gcInterval) {
+    if (this.adapter.gc && this.#gcInterval) {
       const at = new Date();
-      const staleAt = new Date(at.getTime() - this.gcInterval * 2);
+      const staleAt = new Date(at.getTime() - this.#gcInterval * 2);
 
       return this.adapter.gc({
         lockSet: this.lockSet,
-        gcInterval: this.gcInterval,
+        gcInterval: this.#gcInterval,
         at,
         staleAt,
       });
@@ -71,10 +71,10 @@ export class Locker extends EventEmitter {
   }
 
   protected enableGc(): void {
-    if (!this.gcIntervalId && this.gcInterval) {
-      this.gcIntervalId = setInterval(async () => {
+    if (!this.#gcIntervalId && this.#gcInterval) {
+      this.#gcIntervalId = setInterval(async () => {
         if (this.lockSet.size === 0) {
-          this.gcIntervalId && clearInterval(this.gcIntervalId);
+          this.#gcIntervalId && clearInterval(this.#gcIntervalId);
         } else {
           try {
             const garbageCycle = await this.gc();
@@ -85,14 +85,14 @@ export class Locker extends EventEmitter {
             this.emit(LockerEventKind.Error, error);
           }
         }
-      }, this.gcInterval);
+      }, this.#gcInterval);
     }
   }
 
   @Memoize()
   public async setup(): Promise<void> {
     if (this.adapter.setup) {
-      await this.adapter.setup({ gcInterval: this.gcInterval });
+      await this.adapter.setup({ gcInterval: this.#gcInterval });
     }
   }
 
