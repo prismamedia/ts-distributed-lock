@@ -7,7 +7,9 @@
     "build": "tsc --build",
     "build:clean": "tsc --build --clean",
     "build:watch": "tsc --build --watch",
-    "test": "yarn workspaces foreach --exclude . run test",
+    "test": "yarn workspaces foreach --exclude root-workspace-0b6124 run test",
+    "version": "yarn workspaces foreach --exclude root-workspace-0b6124 version --immediate --force",
+    "publish": "yarn workspaces foreach --exclude root-workspace-0b6124 npm publish --tolerate-republish",
     "clean": "git clean -dfqx -- .",
     "prettier": "prettier --write \"packages/*/src/**/*.ts\""
   },

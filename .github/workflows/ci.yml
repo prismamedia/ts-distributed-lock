@@ -43,6 +43,8 @@ jobs:
 
       - name: Import Yarn plugins
         run: |
+          yarn plugin runtime
+          yarn plugin import @yarnpkg/plugin-version
           yarn plugin import @yarnpkg/plugin-workspace-tools
 
       - name: Build
@@ -53,16 +55,8 @@ jobs:
         env:
           MONGODB_URL: mongodb://127.0.0.1:${{ job.services.mongodb.ports[27017] }}/ts-distributed-lock-tests
 
-      - name: Publish "ts-distributed-lock" to npmjs
+      - name: Publish to npmjs
         if: "matrix.publish == true && startsWith(github.ref, 'refs/tags/')"
-        working-directory: packages/ts-distributed-lock
-        run: yarn npm publish --tolerate-republish
-        env:
-          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_REGISTRY_AUTH_TOKEN }}
-
-      - name: Publish "ts-distributed-lock-mongodb-adapter" to npmjs
-        if: "matrix.publish == true && startsWith(github.ref, 'refs/tags/')"
-        working-directory: packages/ts-distributed-lock-mongodb-adapter
-        run: yarn npm publish --tolerate-republish
+        run: yarn run publish
         env:
           YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_REGISTRY_AUTH_TOKEN }}
