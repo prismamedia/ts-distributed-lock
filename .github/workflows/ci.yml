@@ -25,7 +25,6 @@ jobs:
     services:
       mongodb:
         image: mongo:${{ matrix.mongo }}
-        ports: [27017]
 
     steps:
       - name: Checkout the code
@@ -51,7 +50,7 @@ jobs:
       - name: Test
         run: yarn run test
         env:
-          MONGODB_URL: mongodb://127.0.0.1:${{ job.services.mongodb.ports[27017] }}/ts-distributed-lock-tests
+          MONGODB_URL: mongodb://mongodb:27017/ts-distributed-lock-tests
 
       - name: Publish to npmjs
         if: "matrix.publish == true && startsWith(github.ref, 'refs/tags/')"

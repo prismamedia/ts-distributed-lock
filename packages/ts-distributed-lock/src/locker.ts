@@ -31,12 +31,12 @@ export type LockerEventMap = {
   [LockerEventKind.Error]: Error;
 };
 
-export type LockerOptions = {
+export type TLockerOptions = Partial<{
   /**
    * Optional, every "gc"ms, a garbage collector cleans the "lost" locks, default: 60000
    */
-  gc?: number | null;
-};
+  gc: number;
+}>;
 
 export class Locker extends EventEmitter {
   readonly lockSet = new LockSet();
@@ -46,12 +46,12 @@ export class Locker extends EventEmitter {
 
   public constructor(
     readonly adapter: AdapterInterface,
-    readonly options: Partial<LockerOptions> = {},
+    options?: TLockerOptions,
   ) {
     super();
 
     this.#gcInterval =
-      adapter.gc && options.gc !== null
+      adapter.gc && typeof options?.gc === 'number'
         ? Math.max(1, options.gc || 60000)
         : null;
   }
@@ -91,9 +91,7 @@ export class Locker extends EventEmitter {
 
   @Memoize()
   public async setup(): Promise<void> {
-    if (this.adapter.setup) {
-      await this.adapter.setup({ gcInterval: this.#gcInterval });
-    }
+    await this.adapter.setup?.({ gcInterval: this.#gcInterval });
   }
 
   public async releaseAll(): Promise<void> {

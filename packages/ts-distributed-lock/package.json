@@ -1,6 +1,6 @@
 {
   "name": "@prismamedia/ts-distributed-lock",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "license": "MIT",
   "contributors": [
     "Yvann Boucher <yvann.boucher@gmail.com>"
@@ -28,6 +28,6 @@
     "typescript": "^4.0.3"
   },
   "dependencies": {
-    "@prismamedia/ts-memoize": "^1.1.0"
+    "@prismamedia/ts-memoize": "^1.1.1"
   }
 }

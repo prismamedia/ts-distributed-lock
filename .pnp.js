@@ -776,7 +776,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageLocation": "./packages/ts-distributed-lock/",
           "packageDependencies": [
             ["@prismamedia/ts-distributed-lock", "workspace:packages/ts-distributed-lock"],
-            ["@prismamedia/ts-memoize", "npm:1.1.0"],
+            ["@prismamedia/ts-memoize", "npm:1.1.1"],
             ["@types/jest", "npm:26.0.14"],
             ["@types/node", "npm:14.11.2"],
             ["jest", "npm:26.4.2"],
@@ -792,7 +792,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageDependencies": [
             ["@prismamedia/ts-distributed-lock-mongodb-adapter", "workspace:packages/ts-distributed-lock-mongodb-adapter"],
             ["@prismamedia/ts-distributed-lock", "workspace:packages/ts-distributed-lock"],
-            ["@prismamedia/ts-memoize", "npm:1.1.0"],
+            ["@prismamedia/ts-memoize", "npm:1.1.1"],
             ["@types/jest", "npm:26.0.14"],
             ["@types/mongodb", "npm:3.5.27"],
             ["@types/node", "npm:14.11.2"],
@@ -807,10 +807,10 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
         }]
       ]],
       ["@prismamedia/ts-memoize", [
-        ["npm:1.1.0", {
-          "packageLocation": "./.yarn/cache/@prismamedia-ts-memoize-npm-1.1.0-c9bb5455bb-7e6f80e988.zip/node_modules/@prismamedia/ts-memoize/",
+        ["npm:1.1.1", {
+          "packageLocation": "./.yarn/cache/@prismamedia-ts-memoize-npm-1.1.1-9fdb05b8a7-42a36c1e13.zip/node_modules/@prismamedia/ts-memoize/",
           "packageDependencies": [
-            ["@prismamedia/ts-memoize", "npm:1.1.0"]
+            ["@prismamedia/ts-memoize", "npm:1.1.1"]
           ],
           "linkType": "HARD",
         }]

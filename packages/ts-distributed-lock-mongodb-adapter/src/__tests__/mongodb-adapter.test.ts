@@ -1,4 +1,4 @@
-// import { testAdapter } from '@prismamedia/ts-distributed-lock';
+import { testAdapter } from '@prismamedia/ts-distributed-lock';
 import { MongoDBAdapter } from '../mongodb-adapter';
 
 describe('MongoDBAdapter', () => {
@@ -20,11 +20,11 @@ describe('MongoDBAdapter', () => {
     ).toBeInstanceOf(MongoDBAdapter);
   });
 
-  // testAdapter(() => {
-  //   if (!process.env.MONGODB_URL) {
-  //     throw new TypeError(`The env variable "MONGODB_URL" has to be defined`);
-  //   }
+  testAdapter(() => {
+    if (!process.env.MONGODB_URL) {
+      throw new TypeError(`The env variable "MONGODB_URL" has to be defined`);
+    }
 
-  //   return new MongoDBAdapter(process.env.MONGODB_URL);
-  // });
+    return new MongoDBAdapter(process.env.MONGODB_URL);
+  });
 });

@@ -10,7 +10,7 @@ import {
  * For test & debug purpose as it can't be distributed
  */
 export class InMemoryAdapter implements AdapterInterface {
-  private storage: Map<LockName, Map<Lock, Date>> = new Map();
+  private storage = new Map<LockName, Map<Lock, Date>>();
 
   public async setup() {
     // Do nothing
