@@ -25,6 +25,7 @@ jobs:
     services:
       mongodb:
         image: mongo:${{ matrix.mongo }}
+        ports: [27017]
 
     steps:
       - name: Checkout the code
