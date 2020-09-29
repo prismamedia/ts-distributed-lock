@@ -10,7 +10,7 @@ services:
     restart: 'unless-stopped'
 
   project:
-    build: .
+    image: node:12
     working_dir: /workspace
     depends_on:
       - mongo

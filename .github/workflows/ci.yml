@@ -33,17 +33,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Setup Yarn berry
-        run: yarn set version berry
-
       - name: Validate dependencies
         run: yarn install --immutable --immutable-cache
-
-      - name: Import Yarn plugins
-        run: |
-          yarn plugin runtime
-          yarn plugin import @yarnpkg/plugin-version
-          yarn plugin import @yarnpkg/plugin-workspace-tools
 
       - name: Build
         run: yarn run build
