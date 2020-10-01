@@ -63,10 +63,10 @@ export class MongoDBAdapter implements AdapterInterface {
   ) {
     this.#client = new MongoClient(url, {
       ...options,
-      readPreference: ReadPreference.PRIMARY,
+      validateOptions: true,
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      validateOptions: true,
+      readPreference: ReadPreference.PRIMARY,
     });
 
     this.#collectionName = collectionName || 'locks';
@@ -129,40 +129,57 @@ export class MongoDBAdapter implements AdapterInterface {
     );
   }
 
-  public async gc({
+  /**
+   * Delete the locks not refreshed soon enought
+   */
+  protected async gcCollect({
+    staleAt,
+  }: AdapterGarbageCollectorParams): Promise<number> {
+    const collection = await this.getCollection();
+    const result = await collection.updateMany(
+      {},
+      { $pull: { queue: { at: { $lt: staleAt } } } },
+    );
+
+    return result.modifiedCount;
+  }
+
+  /**
+   * Refresh the registered locks
+   */
+  protected async gcRefresh({
     lockSet,
     at,
-    staleAt,
-  }: AdapterGarbageCollectorParams): Promise<GarbageCycle> {
+  }: AdapterGarbageCollectorParams): Promise<number> {
     const collection = await this.getCollection();
 
-    const [
-      { modifiedCount: collectedCount },
-      { modifiedCount: refreshedCount = 0 },
-    ] = await Promise.all([
-      // We delete the locks not refreshed soon enought
-      collection.updateMany({}, { $pull: { queue: { at: { $lt: staleAt } } } }),
+    const result = await collection.bulkWrite(
+      [...lockSet].map((lock) => ({
+        updateOne: {
+          filter: { 'queue.id': lock.id },
+          update: {
+            // By updating these "at" dates, we keep them fresh and out of the next garbage collector's collecting cycle
+            $max: {
+              // Keep this very lock
+              'queue.$.at': at,
+              // Keep all locks of the same name, because of the TTL on index
+              at,
+            },
+          },
+        },
+      })),
+      { ordered: false },
+    );
 
-      // We refresh the registered locks
-      lockSet.size > 0
-        ? collection.bulkWrite(
-            [...lockSet].map((lock) => ({
-              updateOne: {
-                filter: { 'queue.id': lock.id },
-                update: {
-                  // By updating these "at" dates, we keep them fresh and out of the next garbage collector's collecting cycle
-                  $max: {
-                    // Keep this very lock
-                    'queue.$.at': at,
-                    // Keep all locks of the same name, because of the TTL on index
-                    at,
-                  },
-                },
-              },
-            })),
-            { ordered: false },
-          )
-        : { modifiedCount: 0 },
+    return result.modifiedCount || 0;
+  }
+
+  public async gc(
+    params: AdapterGarbageCollectorParams,
+  ): Promise<GarbageCycle> {
+    const [collectedCount, refreshedCount] = await Promise.all([
+      this.gcCollect(params),
+      this.gcRefresh(params),
     ]);
 
     return {

@@ -35,7 +35,8 @@ export class InMemoryAdapter implements AdapterInterface {
 
     lockSet.forEach((lock) => {
       const queue = this.storage.get(lock.name);
-      if (queue && queue.has(lock) && queue.set(lock, at)) {
+      if (queue && queue.has(lock)) {
+        queue.set(lock, at);
         refreshedCount++;
       }
     });

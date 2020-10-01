@@ -10,7 +10,7 @@ export function testAdapter(adapter: () => AdapterInterface): void {
     let locker: Locker;
 
     beforeEach(async (done) => {
-      locker = new Locker(adapter(), { gc: 5000 });
+      locker = new Locker(adapter(), { gc: 1000 });
 
       try {
         await locker.setup();
@@ -231,5 +231,34 @@ export function testAdapter(adapter: () => AdapterInterface): void {
 
       done();
     });
+
+    it('works with high concurrency', async (done) => {
+      const lockName = 'high-concurrency';
+
+      await expect(
+        Promise.all([
+          Promise.all(
+            [...new Array(10)].map(async () =>
+              locker.ensureWritingTaskConcurrency(
+                lockName,
+                async () => sleep(100),
+                { pullInterval: 5 },
+              ),
+            ),
+          ),
+          Promise.all(
+            [...new Array(100)].map(async () =>
+              locker.ensureReadingTaskConcurrency(
+                lockName,
+                async () => sleep(1000),
+                { pullInterval: 5 },
+              ),
+            ),
+          ),
+        ]),
+      ).resolves.toBeTruthy();
+
+      done();
+    }, 30000);
   });
 }

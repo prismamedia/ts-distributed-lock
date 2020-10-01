@@ -9,16 +9,16 @@ export type LockName = string;
 export type LockId = string;
 
 export enum LockType {
-  Writer,
-  Reader,
+  Writer = 'WRITER',
+  Reader = 'READER',
 }
 
 export enum LockStatus {
-  Acquiring,
-  Acquired,
-  Releasing,
-  Released,
-  Rejected,
+  Acquiring = 'ACQUIRING',
+  Acquired = 'ACQUIRED',
+  Releasing = 'RELEASING',
+  Released = 'RELEASED',
+  Rejected = 'REJECTED',
 }
 
 export type LockOptions = {
@@ -120,9 +120,7 @@ export class Lock {
   }
 
   public toString(): string {
-    return `${this.name}/${this.#id} (${LockType[this.#type]} - ${
-      LockStatus[this.#status]
-    })`;
+    return `${this.name}/${this.#id} (${this.#type} - ${this.#status})`;
   }
 
   public set status(status: LockStatus) {

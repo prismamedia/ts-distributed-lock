@@ -23,11 +23,13 @@ export enum LockerEventKind {
   Error = 'error',
 }
 
+export type LockerGarbageCycle = GarbageCycle & { tookInMs: number };
+
 export type LockerEventMap = {
   [LockerEventKind.RejectedLock]: RejectedLock;
   [LockerEventKind.AcquiredLock]: AcquiredLock;
   [LockerEventKind.ReleasedLock]: ReleasedLock;
-  [LockerEventKind.GarbageCycle]: GarbageCycle;
+  [LockerEventKind.GarbageCycle]: LockerGarbageCycle;
   [LockerEventKind.Error]: Error;
 };
 
@@ -41,8 +43,9 @@ export type TLockerOptions = Partial<{
 export class Locker extends EventEmitter {
   readonly lockSet = new LockSet();
 
-  #gcInterval: number | null;
-  #gcIntervalId?: ReturnType<typeof setInterval>;
+  #gcInterval: number | undefined;
+  #gcIntervalId: ReturnType<typeof setInterval> | undefined;
+  #gcIsLocked: boolean = false;
 
   public constructor(
     readonly adapter: AdapterInterface,
@@ -53,37 +56,69 @@ export class Locker extends EventEmitter {
     this.#gcInterval =
       adapter.gc && typeof options?.gc === 'number'
         ? Math.max(1, options.gc || 60000)
-        : null;
+        : undefined;
   }
 
-  public async gc(): Promise<GarbageCycle | undefined> {
+  public async gc(): Promise<LockerGarbageCycle | undefined> {
     if (this.adapter.gc && this.#gcInterval) {
+      const start = process.hrtime.bigint();
+
       const at = new Date();
       const staleAt = new Date(at.getTime() - this.#gcInterval * 2);
 
-      return this.adapter.gc({
+      const cycle = await this.adapter.gc({
         lockSet: this.lockSet,
         gcInterval: this.#gcInterval,
         at,
         staleAt,
       });
+
+      return {
+        ...cycle,
+        tookInMs: Math.round(Number(process.hrtime.bigint() - start) / 1000000),
+      };
     }
   }
 
   protected enableGc(): void {
     if (!this.#gcIntervalId && this.#gcInterval) {
       this.#gcIntervalId = setInterval(async () => {
-        if (this.lockSet.size === 0) {
-          this.#gcIntervalId && clearInterval(this.#gcIntervalId);
-        } else {
-          try {
-            const garbageCycle = await this.gc();
+        if (this.#gcIsLocked) {
+          this.emit(
+            'error',
+            new Error(
+              `The garbage collector has been called despite the previous call is still collecting, the "gc" parameter should be increased, it is currently set at ${
+                this.#gcInterval
+              }ms`,
+            ),
+          );
+
+          return;
+        }
+
+        this.#gcIsLocked = true;
+
+        try {
+          if (this.lockSet.size === 0) {
+            if (this.#gcIntervalId) {
+              clearInterval(this.#gcIntervalId);
+
+              this.#gcIntervalId = undefined;
+            }
+          } else {
+            let garbageCycle: GarbageCycle | undefined;
+            try {
+              garbageCycle = await this.gc();
+            } catch (error) {
+              this.emit(LockerEventKind.Error, error);
+            }
+
             if (garbageCycle) {
               this.emit(LockerEventKind.GarbageCycle, garbageCycle);
             }
-          } catch (error) {
-            this.emit(LockerEventKind.Error, error);
           }
+        } finally {
+          this.#gcIsLocked = false;
         }
       }, this.#gcInterval);
     }

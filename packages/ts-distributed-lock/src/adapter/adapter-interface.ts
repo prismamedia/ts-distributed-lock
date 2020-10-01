@@ -2,19 +2,19 @@ import { Lock, LockSet } from '../lock';
 
 export type AdapterLockParams = {
   lock: Lock;
-  gcInterval: number | null;
+  gcInterval?: number | undefined;
 };
 
 export type AdapterReleaseParams = {
   lock: Lock;
-  gcInterval: number | null;
+  gcInterval?: number | undefined;
 };
 
 export type AdapterSetupParams = {
   /**
-   * Either the garbage collector is enabled (>= 1, in ms) or not (null)
+   * Either the garbage collector is enabled (>= 1, in ms) or not (undefined)
    */
-  gcInterval: number | null;
+  gcInterval?: number | undefined;
 };
 
 export type AdapterGarbageCollectorParams = {
