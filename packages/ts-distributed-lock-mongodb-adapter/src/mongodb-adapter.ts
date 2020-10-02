@@ -21,6 +21,7 @@ import {
   MongoClient,
   MongoClientOptions,
   MongoError,
+  ReadPreference,
 } from 'mongodb';
 import semver, { SemVer } from 'semver';
 
@@ -340,7 +341,10 @@ export class MongoDBAdapter implements AdapterInterface {
           lock.isAcquiring() &&
           !this.isLockAcquired(
             lock,
-            await collection.findOne({ 'queue.id': lock.id }),
+            await collection.findOne(
+              { 'queue.id': lock.id },
+              { readPreference: ReadPreference.PRIMARY },
+            ),
           )
         ) {
           // Nothing to do here

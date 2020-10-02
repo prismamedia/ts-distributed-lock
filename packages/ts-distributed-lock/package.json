@@ -1,6 +1,6 @@
 {
   "name": "@prismamedia/ts-distributed-lock",
-  "version": "2.1.6",
+  "version": "2.1.7",
   "license": "MIT",
   "contributors": [
     "Yvann Boucher <yvann.boucher@gmail.com>"

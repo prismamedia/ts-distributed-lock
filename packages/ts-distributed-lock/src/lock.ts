@@ -72,7 +72,7 @@ export class Lock {
     type: LockType,
     readonly options: Partial<LockOptions> = {},
   ) {
-    this.#id = crypto.randomBytes(4).toString('base64');
+    this.#id = crypto.randomBytes(4).toString('hex');
     this.#type = type;
     this.#status = LockStatus.Acquiring;
     this.#createdAt = new Date();
