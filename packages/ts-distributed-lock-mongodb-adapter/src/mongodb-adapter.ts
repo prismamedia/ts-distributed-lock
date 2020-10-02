@@ -40,7 +40,13 @@ type Document = {
 };
 
 export type MongoDBAdapterOptions = Partial<
-  MongoClientOptions & {
+  Omit<
+    MongoClientOptions,
+    | 'validateOptions'
+    | 'useNewUrlParser'
+    | 'useUnifiedTopology'
+    | 'readPreference'
+  > & {
     // Name of the collection where the locks are stored, default: "locks"
     collectionName: string;
 
