@@ -200,7 +200,7 @@ export class MongoDBAdapter implements AdapterInterface {
       indices.push({
         name: 'idx_at',
         key: { at: 1 },
-        expireAfterSeconds: Math.ceil((gcInterval * 2) / 1000),
+        expireAfterSeconds: Math.ceil((gcInterval * 3) / 1000),
       });
     }
 
