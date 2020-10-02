@@ -21,7 +21,6 @@ import {
   MongoClient,
   MongoClientOptions,
   MongoError,
-  ReadPreference,
 } from 'mongodb';
 import semver, { SemVer } from 'semver';
 
@@ -42,10 +41,7 @@ type Document = {
 export type MongoDBAdapterOptions = Partial<
   Omit<
     MongoClientOptions,
-    | 'validateOptions'
-    | 'useNewUrlParser'
-    | 'useUnifiedTopology'
-    | 'readPreference'
+    'validateOptions' | 'useNewUrlParser' | 'useUnifiedTopology'
   > & {
     // Name of the collection where the locks are stored, default: "locks"
     collectionName: string;
@@ -72,7 +68,6 @@ export class MongoDBAdapter implements AdapterInterface {
       validateOptions: true,
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      readPreference: ReadPreference.PRIMARY,
     });
 
     this.#collectionName = collectionName || 'locks';

@@ -633,7 +633,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@prismamedia/ts-distributed-lock-mongodb-adapter@workspace:packages/ts-distributed-lock-mongodb-adapter"
   dependencies:
-    "@prismamedia/ts-distributed-lock": ^2.1.5
+    "@prismamedia/ts-distributed-lock": ^2.1.6
     "@prismamedia/ts-memoize": ^1.1.1
     "@types/jest": ^26.0.14
     "@types/mongodb": ^3.5.27
@@ -647,7 +647,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@prismamedia/ts-distributed-lock@^2.1.5, @prismamedia/ts-distributed-lock@workspace:packages/ts-distributed-lock":
+"@prismamedia/ts-distributed-lock@^2.1.6, @prismamedia/ts-distributed-lock@workspace:packages/ts-distributed-lock":
   version: 0.0.0-use.local
   resolution: "@prismamedia/ts-distributed-lock@workspace:packages/ts-distributed-lock"
   dependencies:
