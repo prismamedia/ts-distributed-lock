@@ -1,6 +1,6 @@
 {
   "name": "@prismamedia/ts-distributed-lock",
-  "version": "2.1.8",
+  "version": "3.0.0",
   "license": "MIT",
   "contributors": [
     "Yvann Boucher <yvann.boucher@gmail.com>"
@@ -10,24 +10,24 @@
     "url": "https://github.com/prismamedia/ts-distributed-lock"
   },
   "engines": {
-    "node": ">=12"
+    "node": ">=14"
   },
   "main": "dist/cjs/index.js",
   "typings": "dist/types/index.d.ts",
   "scripts": {
     "build": "tsc --build",
     "build:watch": "tsc --build --watch",
-    "test": "NODE_ENV=test jest --detectOpenHandles --forceExit --verbose --passWithNoTests",
+    "test": "NODE_ENV=test jest --verbose --passWithNoTests --forceExit",
     "test:watch": "yarn run test --watchAll"
   },
   "devDependencies": {
-    "@types/jest": "^26.0.14",
-    "@types/node": "^14.11.2",
-    "jest": "~26.4.2",
-    "ts-jest": "~26.4.1",
-    "typescript": "^4.0.3"
+    "@types/jest": "26.0.23",
+    "@types/node": "14.17.4",
+    "jest": "27.0.6",
+    "ts-jest": "27.0.3",
+    "typescript": "4.3.4"
   },
   "dependencies": {
-    "@prismamedia/ts-memoize": "^1.1.1"
+    "@prismamedia/ts-memoize": "^1.1.3"
   }
 }

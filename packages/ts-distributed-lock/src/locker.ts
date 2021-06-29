@@ -64,7 +64,7 @@ export class Locker extends EventEmitter {
       const start = process.hrtime.bigint();
 
       const at = new Date();
-      const staleAt = new Date(at.getTime() - this.#gcInterval * 3);
+      const staleAt = new Date(at.getTime() - this.#gcInterval * 2);
 
       const cycle = await this.adapter.gc({
         lockSet: this.lockSet,

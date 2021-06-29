@@ -34,7 +34,7 @@ export type LockOptions = {
 };
 
 export interface SettledLock<
-  TStatus extends LockStatus.Acquired | LockStatus.Rejected
+  TStatus extends LockStatus.Acquired | LockStatus.Rejected,
 > extends Lock {
   settledAt: Date;
   settledIn: number;

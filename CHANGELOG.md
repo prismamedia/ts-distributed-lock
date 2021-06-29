@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
-### Changed
+## [3.0.0] - 2021-06-29
 
-- Upgraded dependencies
+### Removed
+
+- Dropped support for Node 12
+- Dropped support for Mongo 3.2
+
+### Added
+
+- Added support for Node 16
 
 ## [2.0.0] - 2020-03-06
 

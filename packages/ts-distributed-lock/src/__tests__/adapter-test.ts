@@ -9,30 +9,18 @@ export function testAdapter(adapter: () => AdapterInterface): void {
   return describe('Test adapter suite', () => {
     let locker: Locker;
 
-    beforeEach(async (done) => {
+    beforeEach(async () => {
       locker = new Locker(adapter(), { gc: 1000 });
 
-      try {
-        await locker.setup();
-        await locker.releaseAll();
-
-        done();
-      } catch (error) {
-        done.fail(error);
-      }
+      await locker.setup();
+      await locker.releaseAll();
     });
 
-    afterEach(async (done) => {
-      try {
-        await locker.releaseAll();
-
-        done();
-      } catch (error) {
-        done.fail(error);
-      }
+    afterEach(async () => {
+      await locker.releaseAll();
     });
 
-    it(`has a working garbage collector - nothing happens`, async (done) => {
+    it(`has a working garbage collector - nothing happens`, async () => {
       const gc = 500;
       locker = new Locker(adapter(), { gc });
 
@@ -64,11 +52,9 @@ export function testAdapter(adapter: () => AdapterInterface): void {
 
       // Did not "collect" any locks as they were still used
       await expect(locker.releaseMany(locks)).resolves.toBeUndefined();
-
-      done();
     });
 
-    it(`has a working garbage collector - some locks have actually been collected`, async (done) => {
+    it(`has a working garbage collector - some locks have actually been collected`, async () => {
       const gc = 500;
       locker = new Locker(adapter(), { gc });
 
@@ -115,11 +101,9 @@ export function testAdapter(adapter: () => AdapterInterface): void {
           `The lock "${locks[4]}" was not in the queue anymore`,
         ),
       ]);
-
-      done();
     });
 
-    it('works as expected', async (done) => {
+    it('works as expected', async () => {
       locker
         .on(
           LockerEventKind.AcquiredLock,
@@ -165,11 +149,9 @@ export function testAdapter(adapter: () => AdapterInterface): void {
 
       // no more lock is registered
       expect(locker.lockSet.size).toBe(0);
-
-      done();
     });
 
-    it('works as expected for concurrency', async (done) => {
+    it('works as expected for concurrency', async () => {
       const lockName: LockName = 'my-another-lock';
 
       async function getConcurrency(
@@ -228,11 +210,9 @@ export function testAdapter(adapter: () => AdapterInterface): void {
       ).resolves.toBe(1);
 
       expect(locker.lockSet.size).toBe(0);
-
-      done();
     });
 
-    it('works with high concurrency', async (done) => {
+    it('works with high concurrency', async () => {
       const lockName = 'high-concurrency';
 
       await expect(
@@ -257,8 +237,6 @@ export function testAdapter(adapter: () => AdapterInterface): void {
           ),
         ]),
       ).resolves.toBeTruthy();
-
-      done();
     }, 30000);
   });
 }

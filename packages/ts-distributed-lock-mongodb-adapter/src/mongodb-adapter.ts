@@ -138,6 +138,7 @@ export class MongoDBAdapter implements AdapterInterface {
     staleAt,
   }: AdapterGarbageCollectorParams): Promise<number> {
     const collection = await this.getCollection();
+
     const result = await collection.updateMany(
       {},
       { $pull: { queue: { at: { $lt: staleAt } } } },
@@ -260,9 +261,10 @@ export class MongoDBAdapter implements AdapterInterface {
             queue: { id: lock.id, type: lock.type, at: lock.createdAt },
           },
         },
-        {
+        // Because "returnDocument" is not supported for now
+        <{ upsert: true }>{
           upsert: true,
-          returnOriginal: false,
+          returnDocument: 'after',
         },
       );
 

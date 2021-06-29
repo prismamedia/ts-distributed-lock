@@ -8,15 +8,15 @@
     "build:clean": "tsc --build --clean",
     "build:watch": "tsc --build --watch",
     "test": "yarn workspaces foreach --exclude root-workspace-0b6124 run test",
-    "version": "yarn workspaces foreach --exclude root-workspace-0b6124 version --immediate --force",
+    "version": "yarn workspaces foreach --exclude root-workspace-0b6124 version --immediate",
     "publish": "yarn workspaces foreach --exclude root-workspace-0b6124 npm publish --tolerate-republish --access public",
     "clean": "git clean -dfqx -- .",
     "prettier": "prettier --write \"packages/*/src/**/*.ts\""
   },
   "devDependencies": {
-    "@tsconfig/node12": "^1.0.7",
-    "@yarnpkg/pnpify": "^2.3.0",
-    "prettier": "^2.1.2",
-    "typescript": "^4.0.3"
+    "@tsconfig/node14": "1.0.1",
+    "@yarnpkg/pnpify": "2.4.0",
+    "prettier": "2.3.2",
+    "typescript": "4.3.4"
   }
 }

@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   mongo:
-    image: mongo:3.2
+    image: mongo:3.6
     logging:
       options:
         max-size: 50k
@@ -10,7 +10,7 @@ services:
     restart: 'unless-stopped'
 
   project:
-    image: node:12
+    image: node:14
     working_dir: /workspace
     depends_on:
       - mongo
