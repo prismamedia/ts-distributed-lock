@@ -64,7 +64,7 @@ export class Locker extends EventEmitter {
       const start = process.hrtime.bigint();
 
       const at = new Date();
-      const staleAt = new Date(at.getTime() - this.#gcInterval * 2);
+      const staleAt = new Date(at.getTime() - this.#gcInterval * 3);
 
       const cycle = await this.adapter.gc({
         lockSet: this.lockSet,
@@ -126,7 +126,11 @@ export class Locker extends EventEmitter {
 
   @Memoize()
   public async setup(): Promise<void> {
-    await this.adapter.setup?.({ gcInterval: this.#gcInterval });
+    try {
+      await this.adapter.setup?.({ gcInterval: this.#gcInterval });
+    } catch (error) {
+      this.emit(LockerEventKind.Error, error);
+    }
   }
 
   public async releaseAll(): Promise<void> {

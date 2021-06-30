@@ -26,7 +26,7 @@ import {
 import semver, { SemVer } from 'semver';
 
 type NamedIndexSpecification = IndexSpecification & {
-  name: NonNullable<IndexSpecification['name']>;
+  name: string;
 };
 
 type Document = {
@@ -210,11 +210,11 @@ export class MongoDBAdapter implements AdapterInterface {
     try {
       await db.createCollection(this.#collectionName);
     } catch (error) {
-      if (!(error instanceof MongoError && error.code === 48)) {
+      if (error instanceof MongoError && error.code === 48) {
+        // Do nothing, the collection already axists
+      } else {
         throw error;
       }
-
-      // Do nothing, the collection already axists
     }
 
     const collection = await this.getCollection();
@@ -229,9 +229,9 @@ export class MongoDBAdapter implements AdapterInterface {
           await collection.createIndex(key, options);
         }
       }),
-      ...currentIndices.map(async ({ name }) => {
+      ...currentIndices.map(async ({ key, name }) => {
         if (
-          name !== '_id_' &&
+          !(Object.keys(key).length === 1 && key._id === 1) &&
           !indices.find((indice) => indice.name === name)
         ) {
           await collection.dropIndex(name);
