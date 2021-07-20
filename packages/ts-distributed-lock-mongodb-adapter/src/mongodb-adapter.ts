@@ -4,7 +4,6 @@ import {
   AdapterSetupParams,
   GarbageCycle,
   Lock,
-  LockerError,
   LockError,
   LockId,
   LockName,
@@ -14,19 +13,21 @@ import {
 } from '@prismamedia/ts-distributed-lock';
 import { Memoize } from '@prismamedia/ts-memoize';
 import {
-  Admin,
   Collection,
+  CreateIndexesOptions,
   Db,
+  IndexDirection,
   IndexSpecification,
   MongoClient,
   MongoClientOptions,
   MongoError,
   ReadPreference,
 } from 'mongodb';
-import semver, { SemVer } from 'semver';
+import { Except, SetRequired } from 'type-fest';
 
-type NamedIndexSpecification = IndexSpecification & {
-  name: string;
+type IndexDefinition = {
+  specs: IndexSpecification;
+  options: SetRequired<CreateIndexesOptions, 'name'>;
 };
 
 type Document = {
@@ -39,23 +40,26 @@ type Document = {
   at: Date;
 };
 
-export type MongoDBAdapterOptions = Partial<
-  Omit<
-    MongoClientOptions,
-    'validateOptions' | 'useNewUrlParser' | 'useUnifiedTopology'
-  > & {
-    // Name of the collection where the locks are stored, default: "locks"
-    collectionName: string;
+export type MongoDBAdapterOptions = Except<
+  MongoClientOptions,
+  'readPreference'
+> & {
+  /**
+   * Name of the collection where the locks are stored
+   *
+   * Default: locks
+   */
+  collectionName?: string;
 
-    // MongoDB's semantic version, saves a query if known (supports incomplete version like "3" or "3.2")
-    serverVersion: string;
-  }
->;
+  /**
+   * MongoDB's semantic version, saves a query if known (supports incomplete version like "3" or "3.2")
+   */
+  serverVersion?: string;
+};
 
 export class MongoDBAdapter implements AdapterInterface {
   #client: MongoClient;
   #collectionName: string;
-  #serverVersion?: SemVer;
 
   public constructor(
     /**
@@ -66,23 +70,9 @@ export class MongoDBAdapter implements AdapterInterface {
   ) {
     this.#client = new MongoClient(url, {
       ...options,
-      validateOptions: true,
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      readPreference: ReadPreference.PRIMARY,
     });
-
     this.#collectionName = collectionName || 'locks';
-
-    if (typeof serverVersion !== 'undefined') {
-      const coercedServerVersion = semver.coerce(serverVersion);
-      if (!(semver.valid(coercedServerVersion) && coercedServerVersion)) {
-        throw new LockerError(
-          `The provided "serverVersion" is not a valid semantic version: ${serverVersion}`,
-        );
-      }
-
-      this.#serverVersion = coercedServerVersion;
-    }
   }
 
   @Memoize()
@@ -93,42 +83,10 @@ export class MongoDBAdapter implements AdapterInterface {
   }
 
   @Memoize()
-  protected async getAdmin(): Promise<Admin> {
-    const db = await this.getDb();
-
-    return db.admin();
-  }
-
-  @Memoize()
-  protected async getServerVersion(): Promise<SemVer> {
-    if (this.#serverVersion) {
-      return this.#serverVersion;
-    }
-
-    const admin = await this.getAdmin();
-    const { version: serverVersion } = await admin.serverStatus();
-
-    const coercedServerVersion = semver.coerce(serverVersion);
-    if (!(semver.valid(coercedServerVersion) && coercedServerVersion)) {
-      throw new LockerError(
-        `The returned "serverVersion" is not a valid semantic version: ${serverVersion}`,
-      );
-    }
-
-    return coercedServerVersion;
-  }
-
-  @Memoize()
   protected async getCollection(): Promise<Collection<Document>> {
     const db = await this.getDb();
 
-    return new Promise((resolve, reject) =>
-      db.collection(
-        this.#collectionName,
-        { strict: true },
-        (error, collection) => (error ? reject(error) : resolve(collection)),
-      ),
-    );
+    return db.collection(this.#collectionName);
   }
 
   /**
@@ -192,16 +150,29 @@ export class MongoDBAdapter implements AdapterInterface {
   }
 
   public async setup({ gcInterval }: AdapterSetupParams) {
-    const indices: NamedIndexSpecification[] = [
-      { name: 'idx_name', key: { name: 1 }, unique: true },
-      { name: 'idx_queue_id', key: { 'queue.id': 1 } },
+    const indices: IndexDefinition[] = [
+      {
+        specs: { name: 1 },
+        options: {
+          name: 'idx_name',
+          unique: true,
+        },
+      },
+      {
+        specs: { 'queue.id': 1 },
+        options: {
+          name: 'idx_queue_id',
+        },
+      },
     ];
 
     if (gcInterval) {
       indices.push({
-        name: 'idx_at',
-        key: { at: 1 },
-        expireAfterSeconds: Math.ceil((gcInterval * 3) / 1000),
+        specs: { at: 1 },
+        options: {
+          name: 'idx_at',
+          expireAfterSeconds: Math.ceil((gcInterval * 3) / 1000),
+        },
       });
     }
 
@@ -218,21 +189,28 @@ export class MongoDBAdapter implements AdapterInterface {
     }
 
     const collection = await this.getCollection();
-    const currentIndices = await collection.listIndexes().toArray();
+    const currentIndices: {
+      v: number;
+      key: Record<string, IndexDirection>;
+      name: string;
+      ns: string;
+    }[] = await collection.listIndexes().toArray();
 
     await Promise.all([
-      ...indices.map(async ({ key, ...options }) => {
+      ...indices.map(async ({ specs, options }) => {
         try {
-          await collection.createIndex(key, options);
+          await collection.createIndex(specs, options);
         } catch (error) {
+          console.debug(error);
+
           await collection.dropIndex(options.name);
-          await collection.createIndex(key, options);
+          await collection.createIndex(specs, options);
         }
       }),
       ...currentIndices.map(async ({ key, name }) => {
         if (
           !(Object.keys(key).length === 1 && key._id === 1) &&
-          !indices.find((indice) => indice.name === name)
+          !indices.find((indice) => indice.options.name === name)
         ) {
           await collection.dropIndex(name);
         }
@@ -261,8 +239,7 @@ export class MongoDBAdapter implements AdapterInterface {
             queue: { id: lock.id, type: lock.type, at: lock.createdAt },
           },
         },
-        // Because "returnDocument" is not supported for now
-        <{ upsert: true }>{
+        {
           upsert: true,
           returnDocument: 'after',
         },
@@ -304,7 +281,10 @@ export class MongoDBAdapter implements AdapterInterface {
     return modifiedCount === 1;
   }
 
-  protected isLockAcquired(lock: Lock, document: Document | null): boolean {
+  protected isLockAcquired(
+    lock: Lock,
+    document: Document | null | undefined,
+  ): boolean {
     if (!document) {
       throw new LockError(
         lock,
@@ -343,10 +323,7 @@ export class MongoDBAdapter implements AdapterInterface {
           lock.isAcquiring() &&
           !this.isLockAcquired(
             lock,
-            await collection.findOne(
-              { 'queue.id': lock.id },
-              { readPreference: ReadPreference.PRIMARY },
-            ),
+            await collection.findOne({ 'queue.id': lock.id }),
           )
         ) {
           // Nothing to do here

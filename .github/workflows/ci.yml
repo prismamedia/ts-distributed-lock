@@ -10,10 +10,10 @@ jobs:
       fail-fast: false
       matrix:
         node: ['14', '16']
-        mongo: ['3.6']
+        mongo: ['4.0', '4.2', '4.4']
         include:
           - node: '14'
-            mongo: '3.6'
+            mongo: '4.0'
             publish: true
             continue-on-error: false
 

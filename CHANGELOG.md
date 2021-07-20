@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [4.0.0] - 2021-07-20
+
+### Removed
+
+- Dropped support for Mongo 3.x
+
+### Added
+
+- Added support for Mongo 4.x
+
 ## [3.0.0] - 2021-06-29
 
 ### Removed
